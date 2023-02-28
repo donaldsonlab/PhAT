@@ -263,7 +263,7 @@ class fiberObj:
             data_dict['Raw_Isosbestic'] = time_slice['Isosbestic'].values.tolist()
             data_dict['time'] =  time_slice['Timestamp'].values.tolist()
             self.channels.add('Raw_Isosbestic')
-        except:
+        except:        
             print('no isosbestic data found')
                        
         shortest_list = min([len(data_dict[ls]) for ls in data_dict])
@@ -294,6 +294,11 @@ class fiberObj:
 
         return a * np.exp(-b * values) + c * np.exp(-d * values) + e
 
+    def fit_lin(self, values, a, b):
+        
+        values = np.array(values)
+        
+        return a * values + b
 #### End Helper Functions #### 
     
 
@@ -550,9 +555,9 @@ class fiberObj:
             normed_ref = [(k / j) for k,j in zip(ref, fitRef)]      
                   
             if linfit_type == 'Least squares':
-                results = ss.linregress(normed_ref, normed_sig, alternative = 'greater')
-                AL = results.slope
-                BL = results.intercept
+                popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref, bounds = ([0, -1], [100, 1]))
+                AL = popt[0]
+                BL = popt[1]
             
             else:
                 sig_q75, sig_q25 = np.percentile(normed_sig, [75 ,25])

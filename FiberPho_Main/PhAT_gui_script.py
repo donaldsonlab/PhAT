@@ -22,7 +22,7 @@ import FiberClass as fc
 
 '''
 Command to run script:
-    Script : panel serve --show FiberGuiScript.py --websocket-max-message-size=104876000 --autoreload
+    panel serve --show PhAT_gui_script.py --websocket-max-message-size=104876000 --autoreload
 '''
 
 #current obj version
@@ -51,30 +51,24 @@ def run_read_csv(event):
     value = fpho_input.value
     global df
     try:
-        ## Look into PyArrow backend for faster CSV reading times ##
-        # read_csv_btn.loading = True
         string_io = io.StringIO(value.decode("utf8"))
         df = pd.read_csv(string_io) #Read into dataframe
         if not df.empty:
-            # read_csv_btn.loading = False
             upload_button.disabled = False # Enables create obj button
             pn.state.notifications.success('Your file has been loaded',
                                            duration = 4000)
             print('Your photometry file has been successfully loaded')
     except AttributeError:
-        # read_csv_btn.loading = False
         upload_button.disabled = False # Enables create obj button
         print("Make sure you choose a file")
         return
     except PermissionError:
-        # read_csv_btn.loading = False
         upload_button.disabled = False # Enables create obj button
         print("You do not have permission to access this file")
         return
     
 # Create fpho object
 def run_init_fiberobj(event):
-    # value = fpho_input.value
     file_name = fpho_input.filename
     obj_name = input_1.value
     global df
@@ -127,7 +121,7 @@ def run_init_fiberobj(event):
         pn.state.notifications.error(
             'Error: Please check logger for more information', duration = 4000)   
         return
-            #Adds to dict
+    #adds new obj to the dict
     fiber_objs[input_params[0]] = new_obj
     pn.state.notifications.success('Created ' + input_params[0] +
                                    ' object!', duration = 4000)
@@ -158,8 +152,8 @@ def run_upload_fiberobj(event = None):
                 temp = pickle.load(file)
             except EOFError:
                 pn.state.notifications.error(
-                'Error: Please check logger for more info',
-                duration = 4000)
+                    'Error: Please check logger for more info',
+                    duration = 4000)
             print("Error uploading " + filename +
                   ". Ensure this is a valid .pkl file")
             continue                    
@@ -176,7 +170,6 @@ def run_upload_fiberobj(event = None):
             'Warning: Please check logger for more info', duration = 4000)
             print("This pickle file is out of date." + 
                 "It may cause problems in certain functions")
-            #Object uploaded notification
         pn.state.notifications.success('Uploaded ' + temp.obj_name
                                    + ' object!', duration = 4000)
     existing_objs = fiber_objs
