@@ -1,7 +1,6 @@
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 *.pyc
-*.pickle
 *.csv
 /tests
 *.DS_Store
