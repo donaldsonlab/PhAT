@@ -26,7 +26,7 @@ Command to run script:
 '''
 
 #current obj version
-current_version = 1
+current_version = 2
 pn.extension('terminal', notifications = True, sizing_mode = 'stretch_width')
 pn.extension('plotly')
 pn.extension(loading_spinner='arcs', loading_color='#00aa41')
@@ -121,7 +121,12 @@ def run_init_fiberobj(event):
             'Error: Please check logger for more info', duration = 4000)
         print('There is already an object with this name')
         return
-          
+    try: df 
+    except NameError:
+        pn.state.notifications.error(
+        'Error: Please check logger for more info', duration = 4000)
+        print('Please load or reload your file with the "Read CSV" button')  
+        return   
     try:
         #Add to dict if object name does not already exist
         new_obj = fc.fiberObj(df, input_params[0], input_params[1],
@@ -196,18 +201,25 @@ def run_upload_fiberobj(event):
                       ". Ensure this is a valid .pkl file")
                 continue
         fiber_objs[temp_obj.obj_name] = temp_obj
-        fiber_data.loc[temp_obj.obj_name] = ([temp_obj.fiber_num,
-                                      temp_obj.animal_num,
-                                      temp_obj.exp_date,
-                                      temp_obj.exp_start_time,
-                                      temp_obj.filename,
-                                      temp_obj.beh_filename])
-        info_table.value = fiber_data
-        if not hasattr(temp_obj, 'version') and temp_obj != current_version:
+        if not hasattr(temp_obj, 'version') or temp_obj.version != current_version:
             pn.state.notifications.error(
             'Warning: Please check logger for more info', duration = 4000)
-            print("This pickle file is out of date." + 
+            print(temp_obj.obj_name + " is out of date. " + 
                   "It may cause problems in certain functions")
+        try:
+            fiber_data.loc[temp_obj.obj_name] = ([temp_obj.fiber_num,
+                                          temp_obj.animal_num,
+                                          temp_obj.exp_date,
+                                          temp_obj.exp_start_time,
+                                          temp_obj.filename,
+                                          temp_obj.beh_filename])
+            info_table.value = fiber_data
+        except Exception as e:
+            pn.state.notifications.error(
+                'Error: Please check logger for more info', duration = 4000)
+            logger.error(traceback.format_exc())
+            print("There was an issue adding " + temp_obj.obj_name +
+                  "'s information to the table.")
         pn.state.notifications.success('Uploaded ' + temp_obj.obj_name
                                    + ' object!', duration = 4000)
     existing_objs = fiber_objs

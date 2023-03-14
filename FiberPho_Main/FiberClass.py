@@ -103,14 +103,14 @@ class fiberObj:
         self.fiber_num = fiber_num
         self.animal_num = animal_num
         self.exp_date = exp_date
-        self.exp_time = exp_start_time
+        self.exp_time = exp_time
         self.start_time = start_time #looking for better names
         self.stop_time = stop_time #looking for better names
         self.filename = filename
         self.beh_filename = 'N/A'
         self.behaviors = set()
         self.channels = set()
-        self.version = 1
+        self.version = 2
         self.color_dict = {'Raw_Green' : 'LawnGreen', 'Raw_Red': 'Red',
                            'Raw_Isosbestic': 'Cyan',
                            'Normalized_Green': 'MediumSeaGreen',
@@ -1180,18 +1180,19 @@ class fiberObj:
         fig.update_yaxes(title_text = 'Fluorescence (au)', col = 1, row = 1)
         fig.update_yaxes(title_text = norm_type, col = 2, row = 1)
 
-        results = {'Object Name': self.obj_name, 'Behavior': beh, 'Channel' : channel,
-                   'Max value' : max(avgerage),
-                   'Time of max ' : graph_time[np.argmax(avgerage)], 
-                   'Min value': min(avgerage), 
-                   'Time of min' : graph_time[np.argmin(avgerage)],
-                   'range' : max(avgerage) - min(avgerage), 
-                   'Average value before event' : np.mean(avgerage[:zero_idx]),
-                   'Average value after event' : np.mean(avgerage[zero_idx:]),
-                   'Time before':time_before, 'Time after':time_after,
-                   'Number of events' : n_events, 'Baseline' : PETS_baseline,
-                   'Normalization type' : norm_type}
-        self.PETS_results = self.PETS_results.concat(results, ignore_index = True)
+        results = pd.DataFrame({'Object Name': [self.obj_name],
+                               'Behavior': [beh], 'Channel' : [channel],
+                               'Max value' : [max(avgerage)],
+                               'Time of max ' : [graph_time[np.argmax(avgerage)]], 
+                               'Min value': [min(avgerage)], 
+                               'Time of min' : [graph_time[np.argmin(avgerage)]],
+                               'range' : [max(avgerage) - min(avgerage)], 
+                               'Average value before event' : [np.mean(avgerage[:zero_idx])],
+                               'Average value after event' : [np.mean(avgerage[zero_idx:])],
+                               'Time before' : [time_before], 'Time after': [time_after],
+                               'Number of events' : [n_events], 'Baseline' : [PETS_baseline],
+                               'Normalization type' : [norm_type]})
+        self.PETS_results = pd.concat([self.PETS_results, results])
         if save_csv:
             PETS_data.to_csv(self.obj_name + '_' + channel + '_' + beh +
                                '_Baseline_' + PETS_baseline + '.csv') 
@@ -1345,11 +1346,11 @@ class fiberObj:
             showlegend = False),
             row = 1, col = 2
             )
-        results = {'Object Name': self.obj_name, 'Channel' : channel1,
-                   'Obj2': obj2.obj_name, 'Obj2 Channel': channel2,
-                   'start_time' : start_time, 'end_time' : end_time, 
-                   'R Score' : str(r), 'p score': str(p)}
-        self.correlation_results = self.correlation_results.concat(results, ignore_index = True)
+        results = pd.DataFrame({'Object Name': [self.obj_name], 'Channel' : [channel1],
+                                'Obj2': [obj2.obj_name], 'Obj2 Channel': [channel2], 
+                                'start_time' : [start_time], 'end_time' : [end_time], 
+                                'R Score' : [str(r)], 'p score': [str(p)]})
+        self.correlation_results = pd.concat([self.correlation_results, results])
         fig.update_layout(
             title = 'Correlation between ' + self.obj_name + ' and ' 
                   + obj2.obj_name + ' is, ' + str(r) + ' p = ' + str(p)
@@ -1438,11 +1439,16 @@ class fiberObj:
         fig.update_xaxes(title_text = 'Time (s)', col = 1, row = 1)
         fig.update_yaxes(title_text = 'Fluorescence (au)', col = 1, row = 1)
 
-        results = {'Object 1 Name': self.obj_name, 'Object 1 Channel': channel1, 'Object 2 Name': obj2.obj_name, 'Object 2 Channel': channel2,
-                   'Behavior' : beh, 'Number of Events': self.fpho_data_df[beh].value_counts()['S'],  'R Score' : r, 'p score': p}
-        self.beh_corr_results = self.beh_corr_results.concat(results, ignore_index = True)       
+        results = pd.DataFrame({'Object 1 Name': [self.obj_name],
+                   'Object 1 Channel': [channel1],
+                   'Object 2 Name': [obj2.obj_name],
+                   'Object 2 Channel': [channel2],
+                   'Behavior' : [beh],
+                   'Number of Events': [self.fpho_data_df[beh].value_counts()['S']],
+                   'R Score' : [r], 'p score': [p]})
+        self.beh_corr_results = pd.concat([self.beh_corr_results, results])       
         
-        return figalt
+        return fig
     
 ##### End Class Functions #####
 
