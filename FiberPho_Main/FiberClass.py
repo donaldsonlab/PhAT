@@ -20,7 +20,6 @@ import re
 pn.extension('terminal')
 
 class fiberObj:
-    
     """
     A class to represent a fiber object for fiber photometry and behavior analysis.
 
@@ -28,123 +27,106 @@ class fiberObj:
     ----------
     obj_name : str
         Name of the fiber object
-    
     fiber_num : int
         Fiber number used in photometry data (ranges from 0 - 2 as of now)
-        
     animal_num : int
         The animal number used in the experiment
-        
     exp_date : Date-string (MM/DD)
         Date of the captured photometry recording
-    
     exp_time : Time (Hr/Min)
         Time of the captured photometry recording
-        
     start_time : int
         Time to exclude from beginning of recording
-    
     stop_time : int
         Time to stop at from start of recording 
-        
-    file_name : str
+    filename : str
         File name of the uploaded photometry data
-    
     beh_file : Dataframe
         Stores a pandas dataframe of the behavior recording
-        
     beh_filename : str
         Name of the behavior dataset
-        
     behaviors : set
         Stores unique behaviors of fiber object
-    
     channels : set
         Stores the signals used in photometry data
-    
     fpho_data_dict : dict
         Stores photometry data into a dictionary
-        
     fpho_data_df : Dataframe
         Uses fpho_data_dict to convert photometry data into a pandas dataframe for use
-        
     color_dict : dict
         stores translated channel labels
-    
-    z_score_results : Dataframe
-        stores results of Z-Score computations
-    
+    PETS_results : Dataframe
+        stores results of peri event time series computations
     correlation_results : Dataframe
         stores results of Pearsons computations
-    
     beh_corr_results : Dataframe
         stores results of behavior specific Pearsons computations
-        
-    frame_rate : List ???
+    frame_rate : float
         calculates frame rate of captured data
-        
     """
-    def __init__(self, file, obj, fiber_num, animal, exp_date,
-                 exp_start_time, start_time, stop_time, filename):
+    def __init__(self, file, obj_name, fiber_num, animal_num, exp_date,
+                 exp_time, start_time, stop_time, filename):
         """
-        Constructs all the necessary attributes for the FiberPho object. Holds all 
-        the data from a fiber experiment as well as some results from analysis. 
+        Constructs all the necessary attributes for the FiberPho object.         
         Takes in a fiber photometry file (.csv) and parses it into a dataframe 
-        (fpho_data_df) with 9 columns: time_iso, time_green, time_red, 
-        green_iso, green_green, green_red, red_iso, red_green, red_red.
+        (fpho_data_df) with up to 7 columns: time, time_iso, time_green, time_red, 
+        Raw_Red, Raw_Green, Raw_Isosestic.
 
         Parameters
         ----------
+        file : Datafrmae
+            pandas dataframe created directly from your photometry data .csv file
         obj_name : str
             name of the fiber object
-
         fiber_num : int
             fiber number to analyze (range: 0-20)
-
-        animal_num : int
-            the animal number used in the experiment
-
+        animal_num : int, optional
+            Id number for the animal used in the experiment
         exp_date : Date-string (MM/DD), optional
             date of the captured photometry recording
-
         exp_time : Time (Hr/Min), optional
             time of the captured photometry recording
-
         start_time : int
             time to exclude from beginning of recording
-
         stop_time : int
             time to stop at from start of recording 
-
-        file_name : str
+        filename : str
             file name of the uploaded photometry file
-
+        
         Returns
         ----------
         class object : fiberObj
             Initialized object of type fiberObj
         """
-        self.obj_name = obj
+        
+        self.obj_name = obj_name
         self.fiber_num = fiber_num
-        self.animal_num = animal
+        self.animal_num = animal_num
         self.exp_date = exp_date
-        self.exp_start_time = exp_start_time
+        self.exp_time = exp_start_time
         self.start_time = start_time #looking for better names
         self.stop_time = stop_time #looking for better names
-        self.file_name = filename
+        self.filename = filename
         self.beh_filename = 'N/A'
         self.behaviors = set()
         self.channels = set()
         self.version = 1
-        self.color_dict = {'Raw_Green' : 'LawnGreen', 'Raw_Red': 'Red', 'Raw_Isosbestic': 'Cyan',
-                           'Normalized_Green': 'MediumSeaGreen', 'Normalized_Red': 'Dark_Red',
+        self.color_dict = {'Raw_Green' : 'LawnGreen', 'Raw_Red': 'Red',
+                           'Raw_Isosbestic': 'Cyan',
+                           'Normalized_Green': 'MediumSeaGreen',
+                           'Normalized_Red': 'Dark_Red',
                            'Normalized_Isosbestic':'DeepSkyBlue'}
-        self.z_score_results = pd.DataFrame(columns = ['Object Name', 'Behavior', 'Channel', 'delta Z_score',
-                                                       'Max value', 'Time of max value',
-                                                       'Min value', 'Time of min value',
-                                                       'Average value before event', 'Average value after event',
-                                                       'Time before', 'Time after', 'Number of events',
-                                                       'Baseline', 'Normalization type'])
+        self.PETS_results = pd.DataFrame(columns = ['Object Name', 'Behavior',
+                                                    'Channel', 'range',
+                                                    'Max value',
+                                                    'Time of max value',
+                                                    'Min value',
+                                                    'Time of min value',
+                                                    'Average value before event',
+                                                    'Average value after event',
+                                                    'Time before', 'Time after',
+                                                    'Number of events', 'Baseline',
+                                                    'Normalization type'])
         self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel', 'Obj2', 'Obj2 Channel',
                                                            'start_time', 'end_time', 
                                                            'R Score', 'p score'])
@@ -172,9 +154,25 @@ class fiberObj:
         
         else:
             self.csv__init__(time_slice)
-         
-        
+    
     def npm__init__(self, time_slice):
+        """
+        Called in __init__ if fiber_num is not None. Takes a slice of
+        the photometry dataframe based on start_time and stop_time.
+        Parses the time_slice data so it can be reorganzed for the
+        fpho_data_df attribute.
+        
+        Parameters
+        ----------
+        time_slice : Dataframe
+            A slice of the photometry data csv file from the 
+            start_time to the stop_time
+        
+        Returns
+        ----------
+        None
+        """
+        
         data_dict = {}
         #Check for green ROI
         try: 
@@ -241,8 +239,24 @@ class fiberObj:
         time_cols = [col for col in self.fpho_data_df.columns if 'time' in col]
         self.fpho_data_df.insert(0, 'time', self.fpho_data_df[time_cols].mean(axis = 1))
 
-    
     def csv__init__(self, time_slice): 
+        """
+        Called in __init__ if fiber_num is None. Takes a slice of
+        the photometry dataframe based on start_time and stop_time.
+        Parses the time_slice data so it can be reorganzed for the
+        fpho_data_df attribute.
+        
+        Parameters
+        ----------
+        time_slice : Dataframe
+            A slice of the photometry data csv file from the 
+            start_time to the stop_time
+        
+        Returns
+        ----------
+        None
+        """
+        
         data_dict = {}
          #Check for green ROI
         try: 
@@ -272,60 +286,75 @@ class fiberObj:
             data_dict[ls] = data_dict[ls][:shortest_list-1]
         
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
-        
-    
-#### Helper Functions ####
-    def fit_exp(self, values, a, b, c, d, e):
+
+#### Helper Functions ####          
+    def fit_exp(self, time, a, b, c, d, e):
         """
-        Transforms data into an exponential function
+        Creates np.array of an exponential function
         of the form 
         ..math:: 
             y = A * exp(-B * X) + C * exp(-D * x) + E
 
         Parameters
         ----------
-        values : list
-            data
-
-        a, b, c, d, e : int/float
-            estimates for the parameter values of A, B, C, D and E
+        time : list
+            time values of you photometry data
+        a, b, c, d, e : float
+            Parameter values of A, B, C, D and E found using ss.curve_fit
+            to fit your photometry data to a biexponential.
+        
+        Returns
+        ---------- 
+        np.array 
+            y values of the biexponential fit for you photometry data
         """
-        values = np.array(values)
+        time = np.array(time)
+        return a * np.exp(-b * time) + c * np.exp(-d * time) + e
 
-        return a * np.exp(-b * values) + c * np.exp(-d * values) + e
+    def fit_lin(self, data, a, b):
+        """
+        Linearly transforms data using the coefficients a and b. 
 
-    def fit_lin(self, values, a, b):
+        Parameters
+        ----------
+        time : list
+            time values of you photometry data
+        a : float
+            slope coefficient used to linearly transform data
+        b: float
+            intercept coefficient used to linearly transform data
         
-        values = np.array(values)
+        Returns
+        ---------- 
+        np.array 
+            data linearly transformed
+        """
+        data = np.array(data)
         
-        return a * values + b
+        return a * data + b
 #### End Helper Functions #### 
-    
-
     
 ##### Class Functions #####
     def combine_objs(self, obj2, new_obj_name, combine_type, time_adj):
         """
-        Combines all data from two different objectss into a new object.
+        Combines attributes from two different objects to create a new object.
 
         Parameters
         ----------
         obj2 : fiberObj
-            object that will be concatenated to the end of the first objects dataframe
-
+            object that will be concatenated to the first objects
         new_obj_name : str
             name for the combined obj that will be created
-
         combine_type : str
             One of four ways to adjust the time to combine the two dataframes
-
         time_adj : float
-            time adjustment for obj2 in different ways
+            time adjustment a value used in different ways
             depending on the combine_type selected
 
         Returns
         ----------
         class object : fiberObj
+            a new fiber object that contains data from two existing objects
         """
         #first check for compatibility
         if self.version != obj2.version:
@@ -354,17 +383,22 @@ class fiberObj:
         if self.exp_date != obj2.exp_date:
             self.exp_date = self.exp_date + ', ' + obj2.exp_date
         
-        if self.file_name != obj2.file_name:
-            self.file_name = self.file_name + ', ' + obj2.file_name
+        if self.filename != obj2.filename:
+            self.filename = self.filename + ', ' + obj2.filename
 
         if self.beh_filename != obj2.beh_filename:
             self.beh_filename = self.beh_filename + ', ' + obj2.beh_filename
-        self.z_score_results = pd.DataFrame(columns = ['Object Name', 'Behavior', 'Channel', 'delta Z_score',
-                                                       'Max Z_score', 'Max Z_score Time',
-                                                       'Min Z_score', 'Min Z_score Time',
-                                                       'Average Z_score Before', 'Average Z_score After',
-                                                       'Time Before', 'Time After', 'Number of events',
-                                                       'Z_score Baseline'])
+        self.PETS_results = pd.DataFrame(columns = ['Object Name', 'Behavior',
+                                                    'Channel', 'range',
+                                                    'Max value',
+                                                    'Time of max value',
+                                                    'Min value',
+                                                    'Time of min value',
+                                                    'Average value before event',
+                                                    'Average value after event',
+                                                    'Time before', 'Time after',
+                                                    'Number of events', 'Baseline',
+                                                    'Normalization type'])
         self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel', 'Obj2', 'Obj2 Channel',
                                                            'start_time', 'end_time', 
                                                            'R Score', 'p score'])
@@ -422,7 +456,7 @@ class fiberObj:
         return 
     
     #Signal Trace function
-    def raw_signal_trace(self):
+    def plot_traces(self):
         """
         Creates and displays graphs of a fiber object's signals.
 
@@ -433,7 +467,7 @@ class fiberObj:
         Returns
         -------
         fig : plotly.graph_objects.Scatter
-            Plot of raw signal traces
+            Plot of all traces in the object
         """
 
         fig = make_subplots(rows = 1, cols = 1, shared_xaxes = True,
@@ -468,20 +502,28 @@ class fiberObj:
     def normalize_a_signal(self, signal, reference,
                            biexp_thres, linfit_type):
         """
+        Normalizes signal using user specified normalization technique. 
+        Adds normalized traces to the fpho_data_df attribute of the object.
+        Creates a plots to visualize the normalization process.
         Creates a plot normalizing 1 fiber data to an
         exponential of the form y=A*exp(-B*X)+C*exp(-D*x)
 
         Parameters
         ----------
         signal : string
-                user channel selection
+            the key of the channel to normalize
         reference : string
-                user reference trace selection
+            the key of the channel to be used as a reference or None
+        biexp_thres : float
+            value used to reject poor biexponential fits
+        linfit_type : string
+            one of two options used to determine of to define
+            coefficients for the linear fit
         Returns
         --------
-        output_filename_f1GreenNormExp.png
-        & output_filename_f1RedNormExp.png: png files
-        containing the normalized plot for each fluorophore
+        fig : plotly.graph_objects.Scatter
+            plot with a different panel for each step in the
+            normalization process
         """
         # Get coefficients for normalized fit using first guesses
         # for the coefficients - B and D (the second and fourth
@@ -753,25 +795,27 @@ class fiberObj:
 
     def import_behavior_data(self, beh_data, filename):
         """
-        Takes a file name and returns a dataframe of parsed data
+        Takes a .csv file with behavior data and adds it to the
+        fpho_data_df dataframe
 
         Parameters
         ----------
-        file : string
-            String that contains the entire csv file
-
+        beh_data : Dataframe
+            Dataframe created from the behavior data .csv file
+        filename : string
+            name of behavior data .csv file
+        
         Returns
         --------
-        behaviorData : pandas dataframe
-            contains - Time(total msec), Time(sec), 
-            Subject, Behavior, Status
+        None
         """
         beh_data = beh_data.sort_values('Time')
 
         unique_behaviors = beh_data['Behavior'].unique()
         for beh in unique_behaviors:
             if beh in self.fpho_data_df.columns:
-                print(beh + ' is already in ' + self.obj_name + ' and cannot be added again.')
+                print(beh + ' is already in ' + self.obj_name +
+                      ' and cannot be added again.')
             else:
                 self.behaviors.add(beh)
                 idx_of_beh = [i for i in range(len(beh_data['Behavior']
@@ -807,20 +851,21 @@ class fiberObj:
 
     def plot_behavior(self, behaviors, channels):
         """
-        Plots behavior specific signals
+        Creates a plot for one or more channels with behavior data
+        overlaid as colored rectangles.
         
         Parameters
         ----------
         behaviors : list
             user selected behaviors
-        
         channels : list
             user selected channel
             
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
-            Scatter plot of select behavior signals
+            Scatter plot of photometry signal with behavior data
+            overlaid as colored rectangles
         """
         
         fig = make_subplots(rows = len(channels), cols = 1,
@@ -889,53 +934,45 @@ class fiberObj:
         return fig
         
     
-    def plot_zscore(self, channel, beh, time_before, time_after,
+    def plot_PETS(self, channel, beh, time_before, time_after,
                     baseline = 0, base_option = 'Each event', show_first = 0,
                     show_last = -1, show_every = 1,
                     save_csv = False, percent_bool = False):
         
         """
-        Takes a dataframe and creates plot of z-scores for
-        each time a select behavior occurs with the avg
-        z-score and SEM. Stores results in dataframe
+        Takes a dataframe and creates plot of the photometry data around
+        the start of each occurance of a behavior as well as average and 
+        SEM of the data at all occurances. Stores results in dataframe.
     
         Parameters
         ----------
         channel : string
             user selected channels
-        
         beh : string
             user selected behaviors
-        
         time_before : int
             timestamps to include before event
-            
         time_after : int
             timestamps to include after start of event
-        
         baseline : list, optional
             baseline window start and end times [0, 1] respectively
-        
         base_option : int, optional
             baseline parameter options - start of sample, before events, end of sample
-        
         show_first : int, optional
             show traces from event number [int]
-        
         show_last : int, optional
             show traces up to event number [int]
-            
         show_every : int, optional
             show one in every [int] traces
-        
-        percent_bool
-        
-        save_csv
+        percent_bool: bool
+            if true percent will be calculated as opposed to z-score
+        save_csv: bool
+            if true the dateframe used to create the graph will be saved in a csv file
         
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
-            Plot of z-scores for select behaviors
+            PETS plot for select behaviors
         """
         try:
             full_time = self.fpho_data_df['time' + channel[3:]]
@@ -974,15 +1011,15 @@ class fiberObj:
             row = 1, col =1
             )
 
-        # Initialize array of zscore sums
-        Zscore_data = pd.DataFrame()
+        # Initialize array of time series sums
+        PETS_data = pd.DataFrame()
         # Initialize events counter to 0
         n_events = 0
         
         if base_option == 'Each event':
             base_mean = None
             base_std = None
-            zscore_baseline = 'Each event'
+            PETS_baseline = 'Each event'
         
         elif base_option == 'Start of Sample':
             # idx = np.where((start_event_time > baseline[0]) & (start_event_time < baseline[1]))
@@ -997,7 +1034,7 @@ class fiberObj:
                 base_start_idx:base_end_idx, channel]) 
             base_std = np.nanstd(self.fpho_data_df.loc[
                 base_start_idx:base_end_idx, channel])
-            zscore_baseline = 'From ' + str(baseline[0]) + ' to ' + str(baseline[1])
+            PETS_baseline = 'From ' + str(baseline[0]) + ' to ' + str(baseline[1])
             
         
         elif base_option == 'End of Sample':
@@ -1014,7 +1051,7 @@ class fiberObj:
                 base_start_idx:base_end_idx, channel])
             base_std = np.nanstd(self.fpho_data_df.loc[
                 base_start_idx:base_end_idx, channel])
-            zscore_baseline = 'From ' + str(end_time - start) + ' to ' + str(end_time - end)
+            PETS_baseline = 'From ' + str(end_time - start) + ' to ' + str(end_time - end)
 
         # Loops over all start times for this behavior
         #  time = actual time
@@ -1023,7 +1060,7 @@ class fiberObj:
             if base_option == 'Before Events':
                 start = max(baseline)
                 end = min(baseline)
-                zscore_baseline = 'From ' + str(start) + ' to ' + str(end) + ' before each event'
+                PETS_baseline = 'From ' + str(start) + ' to ' + str(end) + ' before each event'
                 base_start_idx = full_time.searchsorted(
                     time - start)
                 base_end_idx = full_time.searchsorted(
@@ -1055,12 +1092,12 @@ class fiberObj:
                     if base_option == 'Each event':
                         base_mean = np.nanmean(trace)
                         norm_type = 'Percent'
-                    this_Zscore=[((i / base_mean)-1)*100 for i in trace]
+                    this_time_series=[((i / base_mean)-1)*100 for i in trace]
                 else:
-                    this_Zscore = self.zscore(trace, base_mean, base_std)
+                    this_time_series = self.zscore(trace, base_mean, base_std)
                     norm_type = 'Z-score'
                 # Adds each trace to a dict
-                Zscore_data['event' + str(n_events)] = this_Zscore 
+                PETS_data['event' + str(n_events)] = this_time_series 
                 
                 if show_first == 0:
                     show_first = 1
@@ -1081,7 +1118,7 @@ class fiberObj:
                         go.Scatter( 
                         # Times starting at user input start time, ending at user input end time
                         x = time_clip - time,
-                        y = this_Zscore, 
+                        y = this_time_series, 
                         mode = "lines",
                         line = dict(color = trace_color, width = 2),
                         name = 'Event:' + str(n_events),
@@ -1090,17 +1127,17 @@ class fiberObj:
                         row = 1, col = 2
                         )
 
-        avg_Zscore = Zscore_data.mean(axis=1).to_list()
-        sem_Zscore = Zscore_data.sem(axis=1).to_list()
+        avgerage = PETS_data.mean(axis=1).to_list()
+        sem = PETS_data.sem(axis=1).to_list()
         graph_time = np.linspace(-time_before, time_after,
-                                 num = len(avg_Zscore)).tolist()
-        Zscore_data.insert(0, 'time', graph_time)
-        Zscore_data.insert(1, 'Average', avg_Zscore)
-        Zscore_data.insert(2, 'SEM', sem_Zscore)
-        Zscore_data.insert(3, 'SEM Upper Bound', Zscore_data['Average'] + Zscore_data['SEM'])
-        Zscore_data.insert(4, 'SEM Lower Bound', Zscore_data['Average'] - Zscore_data['SEM'])
-        upper_bound = Zscore_data['SEM Upper Bound'].to_list()
-        lower_bound = Zscore_data['SEM Lower Bound'].to_list()
+                                 num = len(avgerage)).tolist()
+        PETS_data.insert(0, 'time', graph_time)
+        PETS_data.insert(1, 'Average', avgerage)
+        PETS_data.insert(2, 'SEM', sem)
+        PETS_data.insert(3, 'SEM Upper Bound', PETS_data['Average'] + PETS_data['SEM'])
+        PETS_data.insert(4, 'SEM Lower Bound', PETS_data['Average'] - PETS_data['SEM'])
+        upper_bound = PETS_data['SEM Upper Bound'].to_list()
+        lower_bound = PETS_data['SEM Lower Bound'].to_list()
         zero_idx = np.searchsorted(graph_time, 0)
         fig.add_vline(x = 0, line_dash = "dot", row = 1, col = 2)
         fig.add_trace(
@@ -1124,8 +1161,8 @@ class fiberObj:
             go.Scatter( 
             # Times for baseline window
             x = graph_time,
-            # Y = Zscore average of all event traces
-            y = avg_Zscore,
+            # Y = Average of all event traces
+            y = avgerage,
             mode = "lines",
             line = dict(color = "Black", width = 5),
             name = 'average',
@@ -1136,7 +1173,7 @@ class fiberObj:
         #fig.update_yaxes(range = [.994, 1.004])
 
         fig.update_layout(
-            title = 'Z-score of ' + beh + ' for ' 
+            title = 'PETS plot of ' + beh + ' for ' 
                     + self.obj_name + ' in channel ' + channel
             )   
         fig.update_xaxes(title_text = 'Time (s)')
@@ -1144,20 +1181,20 @@ class fiberObj:
         fig.update_yaxes(title_text = norm_type, col = 2, row = 1)
 
         results = {'Object Name': self.obj_name, 'Behavior': beh, 'Channel' : channel,
-                   'Max value' : max(avg_Zscore),
-                   'Time of max ' : graph_time[np.argmax(avg_Zscore)], 
-                   'Min value': min(avg_Zscore), 
-                   'Time of min' : graph_time[np.argmin(avg_Zscore)],
-                   'delta Z_score' : max(avg_Zscore) - min(avg_Zscore), 
-                   'Average value before event' : np.mean(avg_Zscore[:zero_idx]),
-                   'Average value after event' : np.mean(avg_Zscore[zero_idx:]),
+                   'Max value' : max(avgerage),
+                   'Time of max ' : graph_time[np.argmax(avgerage)], 
+                   'Min value': min(avgerage), 
+                   'Time of min' : graph_time[np.argmin(avgerage)],
+                   'range' : max(avgerage) - min(avgerage), 
+                   'Average value before event' : np.mean(avgerage[:zero_idx]),
+                   'Average value after event' : np.mean(avgerage[zero_idx:]),
                    'Time before':time_before, 'Time after':time_after,
-                   'Number of events' : n_events, 'Baseline' : zscore_baseline,
+                   'Number of events' : n_events, 'Baseline' : PETS_baseline,
                    'Normalization type' : norm_type}
-        self.z_score_results = self.z_score_results.concat(results, ignore_index = True)
+        self.PETS_results = self.PETS_results.concat(results, ignore_index = True)
         if save_csv:
-            Zscore_data.to_csv(self.obj_name + '_' + channel + '_' + beh +
-                               '_Baseline_' + zscore_baseline + '.csv') 
+            PETS_data.to_csv(self.obj_name + '_' + channel + '_' + beh +
+                               '_Baseline_' + PETS_baseline + '.csv') 
         return fig
         
         
@@ -1169,18 +1206,16 @@ class fiberObj:
         Parameters
         ----------
         ls : list
-            list of trace signals
-
+            time series data for one event
         mean : int/float, optional
             baseline mean value
-
         std : int/float, optional
             baseline standard deviation value
 
         Returns
         ----------
         new_ls : list
-            list of calculated z-scores per event
+            zscore values of time series for an event
         """
         # Default Params, no arguments passed
         if mean is None and std is None:
@@ -1189,38 +1224,32 @@ class fiberObj:
         # Calculates zscore per event in list  
         new_ls = [(i - mean) / std for i in ls]
         return new_ls
-        
-        
-        
-        
+    
         
          #return the pearsons correlation coefficient and r value between 2 full channels and plots the signals overlaid and their scatter plot
     def pearsons_correlation(self, obj2, channel1, channel2, start_time, end_time):
         """
-        Takes in user chosen objects and channels then returns the 
-        Pearson’s correlation coefficient and plots the signals. 
+        Calculates the pearsons correlation coefficient for and plot the channels
+        specified by the user. Store results in the self.correlation_results and
+        obj2.correlation_results dataframes.
 
         Parameters
         ----------
         obj2 : fiber object
             second object for correlation analysis
-        
         channel1 : string
-            first object's selected signal for analysis
-        
+            key of the signal selected for the first object
         channel2 : string
-            second object's selected signal for analysis
-        
+            key of the signal selected for the first object
         start_time : int
             starting timestamp of data
-        
         end_time : int
             ending timestamp of data
             
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
-            Plot of signals based on correlation results
+            Plots of both signal against time and the signals against eachother
         """
         try:
             time1 = self.fpho_data_df['time' + channel1[3:]]
@@ -1316,8 +1345,10 @@ class fiberObj:
             showlegend = False),
             row = 1, col = 2
             )
-        results = {'Object Name': self.obj_name, 'Channel' : channel1, 'Obj2': obj2.obj_name, 'Obj2 Channel': channel2, 'start_time' : start_time,
-                   'end_time' : end_time, 'R Score' : str(r), 'p score': str(p)}
+        results = {'Object Name': self.obj_name, 'Channel' : channel1,
+                   'Obj2': obj2.obj_name, 'Obj2 Channel': channel2,
+                   'start_time' : start_time, 'end_time' : end_time, 
+                   'R Score' : str(r), 'p score': str(p)}
         self.correlation_results = self.correlation_results.concat(results, ignore_index = True)
         fig.update_layout(
             title = 'Correlation between ' + self.obj_name + ' and ' 
@@ -1332,24 +1363,26 @@ class fiberObj:
 
     def behavior_specific_pearsons(self, obj2, channel1, channel2, beh):
         """
-        Takes in user chosen objects, channels and behaviors to calculate 
-        the behavior specific Pearson’s correlation and plot the signals. 
+        Calculates the pearsons correlation coefficient for and plots the
+        channels specified by the user during times that a specific behavior
+        is occuring. Store results in the self.beh_corr_results and
+        obj2.beh_corr_results dataframes.
 
         Parameters
         ----------
         obj2 : fiber object
             second object for correlation analysis
-        
-        channel : string
-            user selected signals for analysis
-        
-        beh : string
-            user selected behaviors for analysis 
+        channel1 : string
+            key of the signal selected for the first object
+        channel2 : string
+            key of the signal selected for the first object
+        beh : str
+            key of the behavior
             
         Returns
-        --------
+        ----------
         fig : plotly.graph_objects.Scatter
-            Plot of signals based on behavior specific correlations
+            Plots of both signal against time and the signals against eachother
         """
         
         # behaviorSlice=df.loc[:,beh]
@@ -1409,23 +1442,32 @@ class fiberObj:
                    'Behavior' : beh, 'Number of Events': self.fpho_data_df[beh].value_counts()['S'],  'R Score' : r, 'p score': p}
         self.beh_corr_results = self.beh_corr_results.concat(results, ignore_index = True)       
         
-        return fig
+        return figalt
     
 ##### End Class Functions #####
 
-def lick_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
+def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
     """
-    Converts lickometer data to a BORIS file that is readable by the GUI
+    Converts alternative format behavior data to a BORIS file format.
 
     Parameters
     ----------
-    beh_file : file
-        uploaded lickometer file
+    beh_file : Dataframe
+        Pandas dataframe created from the .csv behavior file
+    time_unit : str
+        One of three options that specifies the time unit used
+        in the .csv behavior file
+    beh_false : str
+        value in the .csv file that signifies when a behavior
+        is not occuring
+    time_between_bouts : float
+        The minumum time between behavioral epochs 
+        that qualifies as two different bouts
 
     Returns
     ----------
-    boris : Dataframe
-        converted data for download
+    boris_df : Dataframe
+        A dataframe of behavior data in the boris format
     """
     boris_df = pd.DataFrame(columns = ['Time', 'Behavior', 'Status'])
     conversion_dict = {'milliseconds':1/1000,'seconds':1,'minutes':60}
