@@ -26,7 +26,7 @@ Command to run script:
 '''
 
 #current obj version
-current_version = 2
+current_version = 3
 pn.extension('terminal', notifications = True, sizing_mode = 'stretch_width')
 pn.extension('plotly')
 pn.extension(loading_spinner='arcs', loading_color='#00aa41')
@@ -211,7 +211,7 @@ def run_upload_fiberobj(event):
             fiber_data.loc[temp_obj.obj_name] = ([temp_obj.fiber_num,
                                           temp_obj.animal_num,
                                           temp_obj.exp_date,
-                                          temp_obj.exp_start_time,
+                                          temp_obj.exp_time,
                                           temp_obj.filename,
                                           temp_obj.beh_filename])
             info_table.value = fiber_data
@@ -270,7 +270,7 @@ def run_combine_objs(event):
     fiber_data.loc[new_obj.obj_name] = ([new_obj.fiber_num, 
                                         new_obj.animal_num,
                                         new_obj.exp_date, 
-                                        new_obj.exp_start_time,
+                                        new_obj.exp_time,
                                         new_obj.filename,
                                         new_obj.beh_filename])
     info_table.value = fiber_data

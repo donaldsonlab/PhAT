@@ -1,6 +1,5 @@
 import sys
 import re
-import copy
 import pandas as pd
 import numpy as np
 import panel as pn
@@ -106,8 +105,8 @@ class FiberObj:
         self.sig_fit_coefficients = ''
         self.ref_fit_coefficients = ''
         self.sig_to_ref_coefficients = ''
-        self.version = 3 #only variable names have changed since version 1 and 2 
-        #out of date objs can be updated by updating attribute variable names 
+        self.version = 3 #only variable names have changed since version 1 and 2
+        #out of date objs can be updated by updating attribute variable names
         #file_name -> filename, startIdx -> start_idx, endIdx -> end_idx
         self.color_dict = {'Raw_Green' : 'LawnGreen', 'Raw_Red': 'Red',
                            'Raw_Isosbestic': 'Cyan',
@@ -137,7 +136,6 @@ class FiberObj:
                                                         'Number of Events',
                                                         'R Score', 'p score'])
         file['Timestamp'] = (file['Timestamp'] - file['Timestamp'][0])
-
         self.frame_rate = (file['Timestamp'].iloc[-1]
                             - file['Timestamp'][0])/len(file['Timestamp'])
         if start_time == 0:
@@ -151,10 +149,8 @@ class FiberObj:
             self.stop_idx = np.searchsorted(file['Timestamp'], stop_time)
 
         time_slice = file.iloc[self.start_idx : self.stop_idx]
-
         if fiber_num is not None:
             self.npm__init__(time_slice)
-
         else:
             self.csv__init__(time_slice)
 
@@ -186,7 +182,6 @@ class FiberObj:
         else:
             green_roi = True
             green_col = np.where(test_green)[0][self.fiber_num - 1]
-
         #Check for red ROI
         try:
             test_red = time_slice.columns.str.endswith('R')
@@ -196,9 +191,7 @@ class FiberObj:
         else:
             red_roi = True
             red_col = np.where(test_red)[0][self.fiber_num - 1]
-
         time_slice.columns = time_slice.columns.str.replace('Flags', 'LedState')
-
         led_states = time_slice['LedState'][2:8].unique()
         npm_dict = {'Green' : {2, 10, 18, 34, 66, 130, 258, 514},
                     'Isosbestic':{1, 9, 17, 33, 65, 129, 257, 513},
@@ -234,7 +227,7 @@ class FiberObj:
                         time_slice['LedState'] == color].iloc[:, red_col].values.tolist()
                     self.channels.add('Raw_Red')
 
-        shortest_list = min([len(data_dict[ls]) for ls in data_dict])
+        shortest_list = min((len(data_dict[ls]) for ls in data_dict))
 
         for ls in data_dict:
             data_dict[ls] = data_dict[ls][:shortest_list-1]
@@ -284,7 +277,6 @@ class FiberObj:
         shortest_len = min(len(channels) for channels in data_dict.items())
         for channel in data_dict:
             data_dict[channel] = data_dict[channel][:shortest_list-1]
-
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
 
 #### Helper Functions ####
@@ -333,7 +325,6 @@ class FiberObj:
 
         return a * data + b
 #### End Helper Functions ####
-
 ##### Class Functions #####
     def combine_objs(self, obj2, new_obj_name, combine_type, time_adj):
         """
@@ -370,7 +361,7 @@ class FiberObj:
                 raw_obj1_channels.add(channel)
         for channel in self.channels:
             if "Normalized" not in channel:
-                raw_obj1_channels.add(channel)
+                raw_obj2_channels.add(channel)
         if raw_obj1_channels != raw_obj2_channels:
             print("""These files cannot be combined because
             they do not have the same raw data channels""")
@@ -546,8 +537,7 @@ class FiberObj:
         sig = self.fpho_data_df[signal]
         popt, pcov = curve_fit(self.fit_exp, sig_time, sig/(1.5*(max(sig))),
                                p0 = (1.0, 0, 1.0, 0, 0),
-                               bounds = (0, np.inf))
-
+                               bounds =  ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
         a_sig= popt[0]  # A value
         b_sig= popt[1]  # B value
         c_sig = popt[2]  # C value
@@ -580,8 +570,8 @@ class FiberObj:
                 ref_time = self.fpho_data_df['time']
             ref = self.fpho_data_df[reference]
             popt, pcov = curve_fit(self.fit_exp, ref_time, ref/(1.5*(max(ref))),
-                                   p0=(1.0, 0, 1.0, 0, 0), bounds = (0,np.inf))
-
+                                   p0=(1.0, 0, 1.0, 0, 0),
+                                   bounds = ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
             a_ref = popt[0]  # A value
             b_ref = popt[1]  # B value
             c_ref = popt[2]  # C value
