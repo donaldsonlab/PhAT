@@ -274,7 +274,7 @@ class FiberObj:
         except:
             print('no isosbestic data found')
 
-        shortest_len = min(len(channels) for channels in data_dict.items())
+        shortest_list = min(len(channels) for channels in data_dict.values())
         for channel in data_dict:
             data_dict[channel] = data_dict[channel][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
@@ -1487,7 +1487,7 @@ def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
 
         for i, v in enumerate(diffs):
             if v > (time_between_bouts / conversion_to_sec):
-                stops.concat((trimmed.iloc[i]['Time']
+                stops.extend((trimmed.iloc[i]['Time']
                               - beh_file.iloc[0]['Time']) * conversion_to_sec)
                 if i+1 < len(diffs):
                     starts.concat((trimmed.iloc[i+1]['Time']
