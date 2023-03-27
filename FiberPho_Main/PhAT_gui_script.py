@@ -375,7 +375,7 @@ def run_plot_traces(event):
             plot_raw_card.append(plot_pane) #Add figure to template
             if save_pdf_rawplot.value:
                 pdf_name = temp.obj_name + "_raw_data.pdf"
-                save_plot(pdf_name, plot_pane.object)S
+                save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -1200,7 +1200,7 @@ convert_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and re
                                     dataframe to update and include subject, behavior,
                                     and status columns to the dataframe.""" ,
                                 width = 200)
-time_unit = pn.widgets.Select(name = 'Time unit', value = ['milliseconds'],
+time_unit = pn.widgets.Select(name = 'Time unit', value = 'milliseconds',
                               options = ['milliseconds', 'seconds', 'minutes'])
 
 beh_false = pn.widgets.TextInput(name = 'value where behavior is not occuring',
@@ -1531,7 +1531,7 @@ material.main.append(pn.Row(upload_beh_card, obj_info_card))
 material.main.append(plot_raw_card)
 material.main.append(norm_sig_card)
 material.main.append(plot_beh_card)
-material.main.append(zscore_card)
+material.main.append(PETS_card)
 material.main.append(pearsons_card)
 material.main.append(beh_corr_card)
 material.main.append(download_results_card)
