@@ -26,7 +26,7 @@ Command to run script:
 '''
 
 #current obj version
-current_version = 2
+current_version = 3
 pn.extension('terminal', notifications = True, sizing_mode = 'stretch_width')
 pn.extension('plotly')
 pn.extension(loading_spinner='arcs', loading_color='#00aa41')
@@ -45,7 +45,8 @@ fiber_data = pd.DataFrame(columns = ['Fiber #',
 # This (hopefully) avoids keeping the prev. csv
 # uploaded in memory and does not get reuploaded
 df = pd.DataFrame()
-
+# ----------------------------------------------------- # 
+#Start of Gui functions
 # Read fpho data
 def run_read_csv(event):
     """
@@ -129,7 +130,7 @@ def run_init_fiberobj(event):
         return   
     try:
         #Add to dict if object name does not already exist
-        new_obj = fc.fiberObj(df, input_params[0], input_params[1],
+        new_obj = fc.FiberObj(df, input_params[0], input_params[1],
                               input_params[2], input_params[3],
                               input_params[4], input_params[5], 
                               input_params[6], input_params[7])    
@@ -139,34 +140,34 @@ def run_init_fiberobj(event):
     except KeyError:
         logger.error(traceback.format_exc())
         pn.state.notifications.error(
-            'Error: Please check logger for more information', duration = 4000)  
+            'Error: Please check logger for more information', duration = 4000)
         print('It looks like theres something wrong with the format of your file')
         return
     except IndexError:
         logger.error(traceback.format_exc())
         pn.state.notifications.error(
-            'Error: Please check logger for more information', duration = 4000)  
+            'Error: Please check logger for more information', duration = 4000)
         print('Are you sure there are ', input_params[1], ' fibers in this file')
         return
     except Exception as e:
         logger.error(traceback.format_exc())
         pn.state.notifications.error(
-            'Error: Please check logger for more information', duration = 4000)   
+            'Error: Please check logger for more information', duration = 4000)
         return
     #adds new obj to the dict
     fiber_objs[input_params[0]] = new_obj
     pn.state.notifications.success('Created ' + input_params[0] +
                                    ' object!', duration = 4000)
     #Adds to relevant info to dataframe
-    fiber_data.loc[input_params[0]] = ([input_params[1], 
+    fiber_data.loc[input_params[0]] = ([input_params[1],
                                         input_params[2],
-                                        input_params[3], 
+                                        input_params[3],
                                         input_params[4],
                                         input_params[7],
                                         'NaN'])
     info_table.value = fiber_data
     existing_objs = fiber_objs
-    
+
     #Updates selectors with new objects
     update_obj_selectas(existing_objs)
     last_filename = fpho_input.filename
@@ -178,12 +179,12 @@ def run_upload_fiberobj(event):
     """
     Unpickles saved objects and adds those objects' information to several
     places inside the GUI.
-    
+
     Parameters
     ----------
     event : int
         NOT USED. Number of times button has been clicked. 
-    
+
     Returns
     ----------
     None
@@ -210,7 +211,7 @@ def run_upload_fiberobj(event):
             fiber_data.loc[temp_obj.obj_name] = ([temp_obj.fiber_num,
                                           temp_obj.animal_num,
                                           temp_obj.exp_date,
-                                          temp_obj.exp_start_time,
+                                          temp_obj.exp_time,
                                           temp_obj.filename,
                                           temp_obj.beh_filename])
             info_table.value = fiber_data
@@ -269,7 +270,7 @@ def run_combine_objs(event):
     fiber_data.loc[new_obj.obj_name] = ([new_obj.fiber_num, 
                                         new_obj.animal_num,
                                         new_obj.exp_date, 
-                                        new_obj.exp_start_time,
+                                        new_obj.exp_time,
                                         new_obj.filename,
                                         new_obj.beh_filename])
     info_table.value = fiber_data
@@ -373,8 +374,8 @@ def run_plot_traces(event):
             plot_pane.object = temp.plot_traces() 
             plot_raw_card.append(plot_pane) #Add figure to template
             if save_pdf_rawplot.value:
-                plot_pane.object.write_image(temp.obj_name + "_raw_data.pdf")
-                print("Saved at: " + os.path.abspath(""))
+                pdf_name = temp.obj_name + "_raw_data.pdf"
+                save_plot(pdf_name, plot_pane.object)S
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -411,8 +412,8 @@ def run_normalize_a_signal(event):
                                           biexp_thres.value, linfit_type.value)
             norm_sig_card.append(plot_pane) #Add figure to template
             if save_pdf_norm.value:
-                plot_pane.object.write_image(objs + '_' + pick_signal.value + "_normalized.pdf")
-                print("Saved at: " + os.path.abspath(""))
+                pdf_name = objs + '_' + pick_signal.value + "_normalized.pdf"
+                save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -492,8 +493,8 @@ def run_plot_behavior(event):
                                               channel_selecta.value) 
             plot_beh_card.append(plot_pane) #Add figure to template
             if save_pdf_beh.value:
-                plot_pane.object.write_image(objs + "_behavior_plot.pdf")
-                print("Saved at: " + os.path.abspath(""))
+                pdf_name = objs + "_behavior_plot.pdf"
+                save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -542,7 +543,8 @@ def run_plot_PETS(event):
                                                         percent_bool.value) 
                     PETS_card.append(plot_pane) #Add figure to template
                     if save_pdf_PETS.value:
-                        plot_pane.object.write_image(objs + "_PSTH.pdf")
+                        pdf_name = objs + "_" + beh + "_" + channel + "_PSTH.pdf"
+                        save_plot(pdf_name, plot_pane.object)
                 except Exception as e:
                     logger.error(traceback.format_exc())
                     pn.state.notifications.error(
@@ -583,7 +585,9 @@ def run_pearsons_correlation(event):
                                                      start, end)
         pearsons_card.append(plot_pane) #Add figure to template
         if save_pdf_time_corr.value:
-                plot_pane.object.write_image(name1 + '_' + name2 + "_correlation.pdf")
+            pdf_name = (name1 + '_' + channel1 + '_and_' + 
+                        name2 + '_' + channel2 + "_correlation.pdf")
+            save_plot(pdf_name, plot_pane.object)
     except ValueError:
         return
     except Exception as e:
@@ -624,8 +628,10 @@ def run_beh_specific_pearsons(event):
                                                                behavior)
             beh_corr_card.append(plot_pane) #Add figure to template 
             if save_pdf_beh_corr.value:
-                plot_pane.object.write_image(name1 + '_' + name2 + '_' + 
-                                behavior + "_correlation.pdf")
+                pdf_name = (name1 + '_' + channel1 + '_and_' + 
+                            name2 + '_' + channel2 + '_' + 
+                            behavior + "_correlation.pdf")
+                save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -721,6 +727,36 @@ def run_convert_alt_beh(event):
                 'Error: Please check logger for more info', duration = 4000)
     else:
         print('Error reading file')
+    return
+#End of GUI Functions
+# ----------------------------------------------------- # 
+
+#Saves plot as pdf.
+def save_plot(graph_name, fig):
+    """
+    Takes in a filename and a fig and saves that fig if a file
+    with the same name does not already exist
+    
+    Parameters
+    ----------
+    graph_name : str
+        Filename 
+    fig : plot_pane.object
+        A plotly figure object typically a graph
+        
+    Returns
+    ----------
+    None
+    """
+    if os.path.exists(os.path.abspath(graph_name)):
+        pn.state.notifications.error(
+        'Error: Please check logger for more info', duration = 4000)
+        print('Your file was not saved because a file named ' + 
+              graph_name + " already exists in this directory. " + 
+              "Please rename or relocate the file and try again")
+    else:
+        fig.write_image(graph_name)
+        print(graph_name + "saved at: " + os.path.abspath(""))
     return
 
 #Updates available signal options based on selected object
@@ -882,10 +918,10 @@ def update_obj_selectas(existing_objs):
     delete_obj_selecta.options = [*existing_objs]
     results_selecta.options = [*existing_objs]
     return
-# ----------------------------------------------------- # 
+# ----------------------------------------------------- #
 # Error logger
 terminal = pn.widgets.Terminal(
-    options = {"cursorBlink": False}, 
+    options = {"cursorBlink": False},
     height = 200,
     sizing_mode = 'stretch_width')
 sys.stdout = terminal
@@ -902,7 +938,7 @@ stream_handler.setLevel(logging.DEBUG)
 logger.addHandler(stream_handler)
 
 #Buttons
-clear_logs = pn.widgets.Button(name = 'Clear Logs', button_type = 'danger', 
+clear_logs = pn.widgets.Button(name = 'Clear Logs', button_type = 'danger',
                                height = 30, width = 40,
                                sizing_mode = 'fixed', align = 'end')
 
@@ -911,11 +947,11 @@ clear_logs.on_click(terminal.clear)
 logger_info = pn.pane.Markdown(""" ##Logger
                             """, height = 40, width = 60)
 
-log_card = pn.Card(pn.Row(logger_info, clear_logs), terminal, title = 'Logs', 
+log_card = pn.Card(pn.Row(logger_info, clear_logs), terminal, title = 'Logs',
                    background = 'WhiteSmoke', width = 600,
                    collapsed = False, collapsible = False)
 
-# ----------------------------------------------------- # 
+# ----------------------------------------------------- #
 #Init fiberobj Widget
 #Input variables
 fpho_input = pn.widgets.FileInput(name = 'Upload FiberPho Data',
@@ -928,9 +964,9 @@ input_3 = pn.widgets.TextInput(name = 'Animal Number',
                               width = 80, placeholder = 'String')
 input_4 = pn.widgets.TextInput(name = 'Exp Date', width = 90, placeholder = 'Date')
 input_5 = pn.widgets.TextInput(name = 'Exp Time', width = 90, placeholder = 'Time')
-input_6 = pn.widgets.IntInput(name = 'Exclude time from beginning of recording',
-                               width = 90, placeholder = 'Seconds', value = 0) #looking for better name
-input_7 = pn.widgets.IntInput(name = 'Stop time from the beginning',
+input_6 = pn.widgets.IntInput(name = 'Exclude time from beginning of recording(s)',
+                               width = 90, placeholder = 'Seconds', value = 0)
+input_7 = pn.widgets.IntInput(name = 'Stop time from the beginning(s)',
                                width = 90, placeholder = 'Seconds',
                               value = -1) #looking for better name
 fiber_num_row = pn.Row(npm_format, input_2)

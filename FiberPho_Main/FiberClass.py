@@ -1,25 +1,17 @@
-from os import error
-import io
 import sys
-import argparse
+import re
 import pandas as pd
 import numpy as np
-import csv
-import pickle
-import plotly.express as px
+import panel as pn
+import scipy.stats as ss
 import plotly.graph_objects as go
 from scipy.optimize import curve_fit
 from plotly.subplots import make_subplots
-from pathlib import Path
-import panel as pn
-from statistics import mean
-import matplotlib.pyplot as plt
-import scipy.stats as ss
-import re
+
 
 pn.extension('terminal')
 
-class fiberObj:
+class FiberObj:
     """
     A class to represent a fiber object for fiber photometry and behavior analysis.
 
@@ -38,10 +30,10 @@ class fiberObj:
     start_time : int
         Time to exclude from beginning of recording
     stop_time : int
-        Time to stop at from start of recording 
+        Time to stop at from start of recording
     filename : str
         File name of the uploaded photometry data
-    beh_file : Dataframe
+        beh_file : Dataframe
         Stores a pandas dataframe of the behavior recording
     beh_filename : str
         Name of the behavior dataset
@@ -67,9 +59,9 @@ class fiberObj:
     def __init__(self, file, obj_name, fiber_num, animal_num, exp_date,
                  exp_time, start_time, stop_time, filename):
         """
-        Constructs all the necessary attributes for the FiberPho object.         
-        Takes in a fiber photometry file (.csv) and parses it into a dataframe 
-        (fpho_data_df) with up to 7 columns: time, time_iso, time_green, time_red, 
+        Constructs all the necessary attributes for the FiberPho object.
+        Takes in a fiber photometry file (.csv) and parses it into a dataframe
+        (fpho_data_df) with up to 7 columns: time, time_iso, time_green, time_red,
         Raw_Red, Raw_Green, Raw_Isosestic.
 
         Parameters
@@ -89,16 +81,16 @@ class fiberObj:
         start_time : int
             time to exclude from beginning of recording
         stop_time : int
-            time to stop at from start of recording 
+            time to stop at from start of recording
         filename : str
             file name of the uploaded photometry file
-        
+
         Returns
         ----------
         class object : fiberObj
             Initialized object of type fiberObj
         """
-        
+
         self.obj_name = obj_name
         self.fiber_num = fiber_num
         self.animal_num = animal_num
@@ -110,7 +102,12 @@ class fiberObj:
         self.beh_filename = 'N/A'
         self.behaviors = set()
         self.channels = set()
-        self.version = 2
+        self.sig_fit_coefficients = ''
+        self.ref_fit_coefficients = ''
+        self.sig_to_ref_coefficients = ''
+        self.version = 3 #only variable names have changed since version 1 and 2
+        #out of date objs can be updated by updating attribute variable names
+        #file_name -> filename, startIdx -> start_idx, endIdx -> end_idx
         self.color_dict = {'Raw_Green' : 'LawnGreen', 'Raw_Red': 'Red',
                            'Raw_Isosbestic': 'Cyan',
                            'Normalized_Green': 'MediumSeaGreen',
@@ -127,80 +124,79 @@ class fiberObj:
                                                     'Time before', 'Time after',
                                                     'Number of events', 'Baseline',
                                                     'Normalization type'])
-        self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel', 'Obj2', 'Obj2 Channel',
-                                                           'start_time', 'end_time', 
+        self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel',
+                                                           'Obj2', 'Obj2 Channel',
+                                                           'start_time', 'end_time',
                                                            'R Score', 'p score'])
-        self.beh_corr_results = pd.DataFrame(columns = ['Object 1 Name', 'Object 1 Channel', 'Object 2 Name',
-                                                        'Object 2 Channel', 'Behavior', 'Number of Events', 
+        self.beh_corr_results = pd.DataFrame(columns = ['Object 1 Name',
+                                                        'Object 1 Channel',
+                                                        'Object 2 Name',
+                                                        'Object 2 Channel',
+                                                        'Behavior',
+                                                        'Number of Events',
                                                         'R Score', 'p score'])
         file['Timestamp'] = (file['Timestamp'] - file['Timestamp'][0])
-        
         self.frame_rate = (file['Timestamp'].iloc[-1]
                             - file['Timestamp'][0])/len(file['Timestamp'])
         if start_time == 0:
             self.start_idx = 0
         else:
             self.start_idx = np.searchsorted(file['Timestamp'], start_time)
-        
+
         if stop_time == -1:
             self.stop_idx = len(file['Timestamp'])
         else:
-            self.stop_idx = np.searchsorted(file['Timestamp'], stop_time) 
-        
-        time_slice = file.iloc[self.start_idx : self.stop_idx]
+            self.stop_idx = np.searchsorted(file['Timestamp'], stop_time)
 
+        time_slice = file.iloc[self.start_idx : self.stop_idx]
         if fiber_num is not None:
             self.npm__init__(time_slice)
-        
         else:
             self.csv__init__(time_slice)
-    
+
     def npm__init__(self, time_slice):
         """
         Called in __init__ if fiber_num is not None. Takes a slice of
         the photometry dataframe based on start_time and stop_time.
         Parses the time_slice data so it can be reorganzed for the
         fpho_data_df attribute.
-        
+
         Parameters
         ----------
         time_slice : Dataframe
-            A slice of the photometry data csv file from the 
+            A slice of the photometry data csv file from the
             start_time to the stop_time
-        
+
         Returns
         ----------
         None
         """
-        
+
         data_dict = {}
         #Check for green ROI
-        try: 
+        try:
             test_green = time_slice.columns.str.endswith('G')
         except:
-            green_ROI = False
+            green_roi = False
             print('no green ROI found')
         else:
-            green_ROI = True
+            green_roi = True
             green_col = np.where(test_green)[0][self.fiber_num - 1]
-            
-        #Check for red ROI   
-        try: 
+        #Check for red ROI
+        try:
             test_red = time_slice.columns.str.endswith('R')
         except:
-            red_ROI = False
+            red_roi = False
             print('no red ROI found')
         else:
-            red_ROI = True
+            red_roi = True
             red_col = np.where(test_red)[0][self.fiber_num - 1]
-        
         time_slice.columns = time_slice.columns.str.replace('Flags', 'LedState')
-
         led_states = time_slice['LedState'][2:8].unique()
         npm_dict = {'Green' : {2, 10, 18, 34, 66, 130, 258, 514},
                     'Isosbestic':{1, 9, 17, 33, 65, 129, 257, 513},
                     'Red': {4, 12, 20, 36, 68, 132, 260, 516}}
-        
+
         for color in led_states:
             if color in npm_dict['Green']:
                 data_dict['time_Green'] =  time_slice[
@@ -214,8 +210,8 @@ class fiberObj:
                 data_dict['time_Isosbestic'] =  time_slice[
                     time_slice['LedState'] == color][
                     'Timestamp'].values.tolist()
-                
-            if green_ROI: 
+
+            if green_roi:
                 if color in npm_dict['Green'] :
                     data_dict['Raw_Green'] = time_slice[
                         time_slice['LedState'] == color].iloc[:, green_col].values.tolist()
@@ -224,75 +220,71 @@ class fiberObj:
                     data_dict['Raw_Isosbestic'] = time_slice[
                         time_slice['LedState'] == color].iloc[:, green_col].values.tolist()
                     self.channels.add('Raw_Isosbestic')
-            
-            if red_ROI: 
+
+            if red_roi:
                 if color in npm_dict['Red']:
                     data_dict['Raw_Red'] = time_slice[
-                        time_slice['LedState'] == color].iloc[:, red_col].values.tolist() 
+                        time_slice['LedState'] == color].iloc[:, red_col].values.tolist()
                     self.channels.add('Raw_Red')
-            
-        shortest_list = min([len(data_dict[ls]) for ls in data_dict])
-        
+
+        shortest_list = min((len(data_dict[ls]) for ls in data_dict))
+
         for ls in data_dict:
             data_dict[ls] = data_dict[ls][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
         time_cols = [col for col in self.fpho_data_df.columns if 'time' in col]
         self.fpho_data_df.insert(0, 'time', self.fpho_data_df[time_cols].mean(axis = 1))
 
-    def csv__init__(self, time_slice): 
+    def csv__init__(self, time_slice):
         """
         Called in __init__ if fiber_num is None. Takes a slice of
         the photometry dataframe based on start_time and stop_time.
         Parses the time_slice data so it can be reorganzed for the
         fpho_data_df attribute.
-        
+
         Parameters
         ----------
         time_slice : Dataframe
-            A slice of the photometry data csv file from the 
+            A slice of the photometry data csv file from the
             start_time to the stop_time
-        
+
         Returns
         ----------
         None
         """
-        
+
         data_dict = {}
          #Check for green ROI
-        try: 
+        try:
             data_dict['Raw_Green'] = time_slice['Green'].values.tolist()
             data_dict['time'] =  time_slice['Timestamp'].values.tolist()
             self.channels.add('Raw_Green')
         except:
             print('no green data found')
-        
-        try: 
+        try:
             data_dict['Raw_Red'] = time_slice['Red'].values.tolist()
             data_dict['time'] =  time_slice['Timestamp'].values.tolist()
             self.channels.add('Raw_Red')
         except:
-            print('no red data found')    
-        
-        try: 
+            print('no red data found')
+        try:
             data_dict['Raw_Isosbestic'] = time_slice['Isosbestic'].values.tolist()
             data_dict['time'] =  time_slice['Timestamp'].values.tolist()
             self.channels.add('Raw_Isosbestic')
-        except:        
+        except:
             print('no isosbestic data found')
-                       
-        shortest_list = min([len(data_dict[ls]) for ls in data_dict])
-        
-        for ls in data_dict:
-            data_dict[ls] = data_dict[ls][:shortest_list-1]
-        
+
+        shortest_len = min(len(channels) for channels in data_dict.items())
+        for channel in data_dict:
+            data_dict[channel] = data_dict[channel][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
 
-#### Helper Functions ####          
+#### Helper Functions ####
     def fit_exp(self, time, a, b, c, d, e):
         """
         Creates np.array of an exponential function
-        of the form 
-        ..math:: 
+        of the form
+        ..math::
             y = A * exp(-B * X) + C * exp(-D * x) + E
 
         Parameters
@@ -302,10 +294,10 @@ class fiberObj:
         a, b, c, d, e : float
             Parameter values of A, B, C, D and E found using ss.curve_fit
             to fit your photometry data to a biexponential.
-        
+
         Returns
-        ---------- 
-        np.array 
+        ----------
+        np.array
             y values of the biexponential fit for you photometry data
         """
         time = np.array(time)
@@ -313,7 +305,7 @@ class fiberObj:
 
     def fit_lin(self, data, a, b):
         """
-        Linearly transforms data using the coefficients a and b. 
+        Linearly transforms data using the coefficients a and b.
 
         Parameters
         ----------
@@ -323,17 +315,16 @@ class fiberObj:
             slope coefficient used to linearly transform data
         b: float
             intercept coefficient used to linearly transform data
-        
+
         Returns
-        ---------- 
-        np.array 
+        ----------
+        np.array
             data linearly transformed
         """
         data = np.array(data)
-        
+
         return a * data + b
-#### End Helper Functions #### 
-    
+#### End Helper Functions ####
 ##### Class Functions #####
     def combine_objs(self, obj2, new_obj_name, combine_type, time_adj):
         """
@@ -341,7 +332,9 @@ class fiberObj:
 
         Parameters
         ----------
-        obj2 : fiberObj
+        self : FiberObj
+            The new object that starts identical to object 1
+        obj2 : FiberObj
             object that will be concatenated to the first objects
         new_obj_name : str
             name for the combined obj that will be created
@@ -358,36 +351,48 @@ class fiberObj:
         """
         #first check for compatibility
         if self.version != obj2.version:
-            print('error')
-            return "an error"
-        
-        if self.channels != obj2.channels:
-            print('error')
-            return "an error" 
-        
+            print('These files cannot be combined do to version incompatibilities')
+            return
+        #find and compare raw data channels
+        raw_obj2_channels = set()
+        raw_obj1_channels = set()
+        for channel in self.channels:
+            if "Normalized" not in channel:
+                raw_obj1_channels.add(channel)
+        for channel in self.channels:
+            if "Normalized" not in channel:
+                raw_obj2_channels.add(channel)
+        if raw_obj1_channels != raw_obj2_channels:
+            print("""These files cannot be combined because
+            they do not have the same raw data channels""")
+            return
+
         if abs(self.frame_rate - obj2.frame_rate) > 1:
             print('error')
-            return "an error"
-        
+            return
+
         if self.behaviors != obj2.behaviors:
             print('Warning: the behaviors in obj1 and different than the behaviors in obj2')
-        
+
         self.obj_name = new_obj_name
-        
+
         if self.fiber_num != obj2.fiber_num:
             self.fiber_num = [self.fiber_num, obj2.fiber_num]
-            
+
         if self.animal_num != obj2.animal_num:
             self.animal_num = [self.animal_num, obj2.animal_num]
 
         if self.exp_date != obj2.exp_date:
             self.exp_date = self.exp_date + ', ' + obj2.exp_date
-        
+
         if self.filename != obj2.filename:
             self.filename = self.filename + ', ' + obj2.filename
 
         if self.beh_filename != obj2.beh_filename:
             self.beh_filename = self.beh_filename + ', ' + obj2.beh_filename
+        #self.start_time and start_idx will be the start time and idx from the first obj
+        self.stop_time = obj2.stop_time
+        self.stop_idx = obj2.stop_idx
         self.PETS_results = pd.DataFrame(columns = ['Object Name', 'Behavior',
                                                     'Channel', 'range',
                                                     'Max value',
@@ -399,62 +404,56 @@ class fiberObj:
                                                     'Time before', 'Time after',
                                                     'Number of events', 'Baseline',
                                                     'Normalization type'])
-        self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel', 'Obj2', 'Obj2 Channel',
-                                                           'start_time', 'end_time', 
+        self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel',
+                                                           'Obj2', 'Obj2 Channel',
+                                                           'start_time', 'end_time',
                                                            'R Score', 'p score'])
-        self.beh_corr_results = pd.DataFrame(columns = ['Object Name', 'Channel', 'Obj2', 'Obj2 Channel',
-                                                        'Behavior', 'Number of Events', 
+        self.beh_corr_results = pd.DataFrame(columns = ['Object Name', 'Channel',
+                                                        'Obj2', 'Obj2 Channel',
+                                                        'Behavior',
+                                                        'Number of Events',
                                                         'R Score', 'p score'])
 
-        # Decide what to do with start_time, stop_time, start_idx and stop_idx. Do I even want to keep them as variables??? idk
-                  # also have to look for all the other hundreds of variables and decide what to do
-        # self.start_time = start_time #looking for better names
-        # self.stop_time = stop_time #looking for better names
-        # self.start_idx = 0
-        # self.stop_idx = len(file['Timestamp'])
-        
         ## Do a bunch of shit to combine the frames
         time_cols = [col for col in self.fpho_data_df.columns if 'time' in col]
         if combine_type == 'Obj2 starts immediately after Obj1':
-                obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
-                                                obj2.fpho_data_df[time_cols[0]][0])
-                obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] +
-                                                self.fpho_data_df[time_cols[0]].iloc[-1] +
-                                                self.frame_rate)
+            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
+                                            obj2.fpho_data_df[time_cols[0]][0])
+            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] +
+                                            self.fpho_data_df[time_cols[0]].iloc[-1] +
+                                            self.frame_rate)
         elif combine_type == 'Use Obj2 current start time':
             if obj2.fpho_data_df[time_cols[0]][0] < self.fpho_data_df[time_cols[0]].iloc[-1]:
                 print(obj2.obj_name + ' starts before ' + self.obj_name +
                       ' ends. Choose a different stitching method' )
-                return 
-                
+                return
+
         elif combine_type == 'Use x secs for Obj2s start time':
             obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
                                                 obj2.fpho_data_df[time_cols[0]][0])
             obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] + time_adj)
-            
+
         elif combine_type == 'Obj2 starts x secs after Obj1 ends':
             obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
                                                 obj2.fpho_data_df[time_cols[0]][0])
             obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] +
                                             self.fpho_data_df[time_cols[0]].iloc[-1] +
                                             time_adj)
-            
-                                                 
-                                                  
+
         #self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
-        
+
         self_beh_cols = self.fpho_data_df.select_dtypes('object').columns
         obj2_beh_cols = obj2.fpho_data_df.select_dtypes('object').columns
+        obj2_temp_df = obj2.fpho_data_df
         for col in self_beh_cols:
             if col not in obj2_beh_cols:
-                obj2.fpho_data_df[col] = ""
+                obj2_temp_df[col] = ""
         for col in obj2_beh_cols:
             if col not in self_beh_cols:
-                self.fpho_data_df[col] = ""        
-        self.fpho_data_df = pd.concat([self.fpho_data_df, obj2.fpho_data_df])
-              
-        return 
-    
+                self.fpho_data_df[col] = ""
+        self.fpho_data_df = pd.concat([self.fpho_data_df, obj2_temp_df], join = 'inner')
+        return
+
     #Signal Trace function
     def plot_traces(self):
         """
@@ -502,7 +501,7 @@ class fiberObj:
     def normalize_a_signal(self, signal, reference,
                            biexp_thres, linfit_type):
         """
-        Normalizes signal using user specified normalization technique. 
+        Normalizes signal using user specified normalization technique.
         Adds normalized traces to the fpho_data_df attribute of the object.
         Creates a plots to visualize the normalization process.
         Creates a plot normalizing 1 fiber data to an
@@ -529,119 +528,121 @@ class fiberObj:
         # for the coefficients - B and D (the second and fourth
         # inputs for p0) must be negative, while A and C (the
         # first and third inputs for p0) must be positive
-        
+
         try:
             sig_time = self.fpho_data_df['time' + signal[3:]]
         except KeyError:
             sig_time = self.fpho_data_df['time']
-        
+
         sig = self.fpho_data_df[signal]
         popt, pcov = curve_fit(self.fit_exp, sig_time, sig/(1.5*(max(sig))),
                                p0 = (1.0, 0, 1.0, 0, 0),
-                               bounds = (0, np.inf))
+                               bounds =  ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
+        a_sig= popt[0]  # A value
+        b_sig= popt[1]  # B value
+        c_sig = popt[2]  # C value
+        d_sig = popt[3]  # D value
+        e_sig = popt[4]  # E value
 
-        AS = popt[0]  # A value
-        BS = popt[1]  # B value
-        CS = popt[2]  # C value
-        DS = popt[3]  # D value
-        ES = popt[4]  # E value
-        
         # Generate fit line using calculated coefficients
-        fitSig = 1.5*(max(sig))*self.fit_exp(sig_time, AS, BS, CS, DS, ES)
-        sigRsquare = np.corrcoef(sig, fitSig)[0,1] ** 2
-        
-        if sigRsquare < biexp_thres:
+        fit_sig = 1.5*(max(sig))*self.fit_exp(sig_time, a_sig, b_sig, c_sig, d_sig, e_sig)
+        sig_r_square = np.corrcoef(sig, fit_sig)[0,1] ** 2
 
-            AS = 0
-            BS = 0
-            CS = 0
-            DS = 0
-            ES = np.median(sig)
-            fitSig = self.fit_exp(sig_time, AS, BS, CS, DS, ES)
-        
-        normed_sig = [(k / j) for k,j in zip(sig, fitSig)]
-        self.fpho_data_df.loc[:, signal + ' expfit'] = fitSig
-        self.sig_fit_coefficients = ['A= ' + str(AS), 'B= ' + str(BS), 'C= ' 
-                                     + str(CS), 'D= ' + str(DS), 'E= ' + str(ES)]
+        if sig_r_square < biexp_thres:
+
+            a_sig= 0
+            b_sig= 0
+            c_sig = 0
+            d_sig = 0
+            e_sig = np.median(sig)
+            fit_sig = self.fit_exp(sig_time, a_sig, b_sig, c_sig, d_sig, e_sig)
+
+        normed_sig = [(k / j) for k,j in zip(sig, fit_sig)]
+        self.fpho_data_df.loc[:, signal + ' expfit'] = fit_sig
+        self.sig_fit_coefficients = ['A= ' + str(a_sig), 'B= ' + str(b_sig), 'C= '
+                                     + str(c_sig), 'D= ' + str(d_sig), 'E= ' + str(e_sig)]
         self.fpho_data_df.loc[:, signal + ' normed to exp']=normed_sig
-                
-        
-        if reference is not None:  
+
+        if reference is not None:
             try:
                 ref_time = self.fpho_data_df['time' + reference[3:]]
             except KeyError:
                 ref_time = self.fpho_data_df['time']
             ref = self.fpho_data_df[reference]
             popt, pcov = curve_fit(self.fit_exp, ref_time, ref/(1.5*(max(ref))),
-                                   p0=(1.0, 0, 1.0, 0, 0), bounds = (0,np.inf))
-
-            AR = popt[0]  # A value
-            BR = popt[1]  # B value
-            CR = popt[2]  # C value
-            DR = popt[3]  # D value
-            ER = popt[4]  # E value     
+                                   p0=(1.0, 0, 1.0, 0, 0),
+                                   bounds = ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
+            a_ref = popt[0]  # A value
+            b_ref = popt[1]  # B value
+            c_ref = popt[2]  # C value
+            d_ref = popt[3]  # D value
+            e_ref = popt[4]  # E value
 
             # Generate fit line using calculated coefficients
 
-            fitRef = 1.5*(max(ref))*self.fit_exp(ref_time, AR, BR, CR, DR, ER)
-            refRsquare = np.corrcoef(ref, fitRef)[0,1] ** 2
+            fit_ref = 1.5*(max(ref))*self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
+            ref_r_square = np.corrcoef(ref, fit_ref)[0,1] ** 2
 
-            if refRsquare < biexp_thres:
-                AR = 0
-                BR = 0
-                CR = 0
-                DR = 0
-                ER = np.median(ref)
-                fitRef = self.fit_exp(ref_time, AR, BR, CR, DR, ER)
+            if ref_r_square < biexp_thres:
+                a_ref = 0
+                b_ref = 0
+                c_ref = 0
+                d_ref = 0
+                e_ref = np.median(ref)
+                fit_ref = self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
 
-            normed_ref = [(k / j) for k,j in zip(ref, fitRef)]      
-                  
+            normed_ref = [(k / j) for k,j in zip(ref, fit_ref)]
+
             if linfit_type == 'Least squares':
-                popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref, bounds = ([0, -1], [100, 1]))
-                AL = popt[0]
-                BL = popt[1]
-            
+                popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
+                                       bounds = ([0, -1], [100, 1]))
+                a_lin = popt[0]
+                b_lin = popt[1]
+
             else:
                 sig_q75, sig_q25 = np.percentile(normed_sig, [75 ,25])
-                sig_IQR = sig_q75 - sig_q25
+                sig_iqr = sig_q75 - sig_q25
                 ref_q75, ref_q25 = np.percentile(normed_ref, [75 ,25])
-                ref_IQR = ref_q75 - ref_q25
+                ref_iqr = ref_q75 - ref_q25
 
-                AL = sig_IQR/ref_IQR
-                BL = np.median(normed_sig) - AL * np.median(normed_ref)
+                a_lin = sig_iqr/ref_iqr
+                b_lin = np.median(normed_sig) - a_lin * np.median(normed_ref)
 
-
-            adjusted_ref=[AL * j + BL for j in normed_ref]
+            adjusted_ref=[a_lin * j + b_lin for j in normed_ref]
             normed_to_ref=[(k / j) for k,j in zip(normed_sig, adjusted_ref)]
-                
-            linR = np.corrcoef(adjusted_ref, normed_sig)[0,1]
 
-            # below saves all the variables we generated to the df #
-            #  data frame inside the obj ex. self 
+            lin_r = np.corrcoef(adjusted_ref, normed_sig)[0,1]
+
+            # below saves all the variables we generated to the df
+            #  data frame inside the obj ex. self
             # and assign all the long stuff to that
-            # assign the AS, BS,.. etc and AR, BR, etc to lists called self.sig_fit_coefficients, self.ref_fit_coefficients and self.sig_to_ref_coefficients
-
-            self.fpho_data_df.loc[:, reference + ' expfit']=fitRef
-            self.ref_fit_coefficients = ['A= ' + str(AR), 'B= ' + str(BR), 'C= ' +
-                                         str(CR), 'D= ' + str(DR), 'E= ' + str(ER)]
+            # assign the a_sig, b_sig,.. etc and a_ref, b_ref, etc to lists called
+            #self.sig_fit_coefficients, self.ref_fit_coefficients and self.sig_to_ref_coefficients
+            self.fpho_data_df.loc[:, reference + ' expfit']=fit_ref
+            self.ref_fit_coefficients = ['A= ' + str(a_ref), 'B= ' + str(b_ref), 'C= ' +
+                                         str(c_ref), 'D= ' + str(d_ref), 'E= ' + str(e_ref)]
             self.fpho_data_df.loc[:, reference + ' normed to exp']=normed_ref
             self.fpho_data_df.loc[:,reference + ' fitted to ' + signal]=adjusted_ref
-            self.sig_to_ref_coefficients = ['A= ' + str(AL), 'B= ' + str(BL)]
-        
-        else: 
+            self.sig_to_ref_coefficients = ['A= ' + str(a_lin), 'B= ' + str(b_lin)]
+
+        else:
             normed_to_ref = normed_sig
-            
+
         self.fpho_data_df.loc[:,'Normalized_' + signal[4:]] = normed_to_ref
         self.channels.add('Normalized_' + signal[4:])
         if reference is not None:
-            fig = make_subplots(rows = 3, cols = 2, x_title = 'Time(s)', y_title = 'Flourescence (au)',
-                        subplot_titles=("Biexponential Fitted to Signal (R^2 = " + str(sigRsquare) + ")",
-                                        "Signal Normalized to Biexponential",
-                                        "Biexponential Fitted to Ref (R^2 = " + str(refRsquare) + ")", 
-                                        "Reference Normalized to Biexponential",
-                                        "Reference Linearly Fitted to Signal(R = " + str(linR) + ")",
-                                        "Final Normalized Signal"),
-                        shared_xaxes = True, vertical_spacing = 0.1)
+            fig = make_subplots(rows = 3, cols = 2, x_title = 'Time(s)',
+                                y_title = 'Flourescence (au)',
+                                subplot_titles=("Biexponential Fitted to Signal (R^2 = " +
+                                                str(sig_r_square) + ")",
+                                                "Signal Normalized to Biexponential",
+                                                "Biexponential Fitted to Ref (R^2 = " +
+                                                str(ref_r_square) + ")",
+                                                "Reference Normalized to Biexponential",
+                                                "Reference Linearly Fitted to Signal(R = " +
+                                                str(lin_r) + ")",
+                                                "Final Normalized Signal"),
+                                shared_xaxes = True, vertical_spacing = 0.1)
             fig.add_trace(
                 go.Scatter(
                 x = sig_time,
@@ -717,7 +718,7 @@ class fiberObj:
                 name = 'Reference linearly scaled to signal',
                 text = 'Reference linearly scaled to signal',
                 showlegend = True),
-                row = 3, col = 1  
+                row = 3, col = 1
                 )
             fig.add_trace(
                 go.Scatter(
@@ -735,19 +736,22 @@ class fiberObj:
                 x = sig_time,
                 y = self.fpho_data_df['Normalized_' + signal[4:]],
                 mode="lines",
-                line = go.scatter.Line(color = "Hot Pink"), 
+                line = go.scatter.Line(color = "Hot Pink"),
                 name = 'Final Normalized Signal',
                 text = 'Final Normalized Signal',
-                showlegend = True), 
+                showlegend = True),
                 row = 3, col = 2
                 )
         else:
-            fig = make_subplots(rows = 1, cols = 2, 
-                                subplot_titles=("Biexponential Fitted to Signal(R^2 = " 
-                                        + str(sigRsquare) + ")",
-                                        "Signal Normalized to Biexponential"),
-                        shared_xaxes = True, vertical_spacing = 0.1,
-                        x_title = "Time (s)", y_title = "Fluorescence (au)")
+            fig = make_subplots(rows = 1, cols = 2,
+                                subplot_titles=(
+                                    "Biexponential Fitted to Signal(R^2 = "
+                                    + str(sig_r_square) + ")",
+                                    "Signal Normalized to Biexponential"
+                                ),
+                                shared_xaxes = True, vertical_spacing = 0.1,
+                                x_title = "Time (s)",
+                                y_title = "Fluorescence (au)")
             fig.add_trace(
                 go.Scatter(
                 x = sig_time,
@@ -781,17 +785,17 @@ class fiberObj:
                 showlegend = True),
                 row = 1, col = 2
                 )
-            
+
         fig.update_layout(
-            title = "Normalizing " + signal + ' for ' + 
+            title = "Normalizing " + signal + ' for ' +
             self.obj_name + ' using ' + linfit_type
         )
         return fig
-    
 
-    # ----------------------------------------------------- # 
+
+    # ----------------------------------------------------- #
     # Behavior Functions
-    # ----------------------------------------------------- # 
+    # ----------------------------------------------------- #
 
     def import_behavior_data(self, beh_data, filename):
         """
@@ -804,13 +808,12 @@ class fiberObj:
             Dataframe created from the behavior data .csv file
         filename : string
             name of behavior data .csv file
-        
+
         Returns
         --------
         None
         """
         beh_data = beh_data.sort_values('Time')
-
         unique_behaviors = beh_data['Behavior'].unique()
         for beh in unique_behaviors:
             if beh in self.fpho_data_df.columns:
@@ -819,28 +822,28 @@ class fiberObj:
             else:
                 self.behaviors.add(beh)
                 idx_of_beh = [i for i in range(len(beh_data['Behavior']
-                             )) if beh_data.loc[i, 'Behavior'] == beh]             
+                             )) if beh_data.loc[i, 'Behavior'] == beh]
                 j = 0
                 self.fpho_data_df[beh] = ' '
                 while j < len(idx_of_beh):
-                    if beh_data.loc[(idx_of_beh[j]), 'Status']=='POINT': 
+                    if beh_data.loc[(idx_of_beh[j]), 'Status']=='POINT':
                         point_idx=self.fpho_data_df['time'].searchsorted(
                             beh_data.loc[idx_of_beh[j],'Time'])
                         self.fpho_data_df.loc[point_idx, beh]='S'
                         j = j + 1
-                    elif (beh_data.loc[(idx_of_beh[j]), 'Status']=='START' and 
+                    elif (beh_data.loc[(idx_of_beh[j]), 'Status']=='START' and
                           beh_data.loc[(idx_of_beh[j + 1]), 'Status']=='STOP'):
-                        startIdx = self.fpho_data_df['time'].searchsorted(
+                        start_idx = self.fpho_data_df['time'].searchsorted(
                             beh_data.loc[idx_of_beh[j],'Time'])
-                        endIdx = self.fpho_data_df['time'].searchsorted(
+                        end_idx = self.fpho_data_df['time'].searchsorted(
                             beh_data.loc[idx_of_beh[j + 1],'Time'])
-                        if endIdx < len(self.fpho_data_df['time']) and startIdx > 0:
-                            self.fpho_data_df.loc[endIdx, beh] = 'E'
-                            self.fpho_data_df.loc[startIdx, beh] = 'S'
-                            self.fpho_data_df.loc[startIdx+1 : endIdx-1, beh] = 'O'
+                        if end_idx < len(self.fpho_data_df['time']) and start_idx > 0:
+                            self.fpho_data_df.loc[end_idx, beh] = 'E'
+                            self.fpho_data_df.loc[start_idx, beh] = 'S'
+                            self.fpho_data_df.loc[start_idx+1 : end_idx-1, beh] = 'O'
                         j = j + 2
-                    else: 
-                        print("\nStart and stops for state behavior:" 
+                    else:
+                        print("\nStart and stops for state behavior:"
                               + beh + " are not paired correctly.\n")
                         sys.exit()
         if self.beh_filename == 'N/A':
@@ -853,27 +856,27 @@ class fiberObj:
         """
         Creates a plot for one or more channels with behavior data
         overlaid as colored rectangles.
-        
+
         Parameters
         ----------
         behaviors : list
             user selected behaviors
         channels : list
             user selected channel
-            
+
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
             Scatter plot of photometry signal with behavior data
             overlaid as colored rectangles
         """
-        
+
         fig = make_subplots(rows = len(channels), cols = 1,
-                            subplot_titles = [channel for channel in channels],
+                            subplot_titles = list(channels),
                             shared_xaxes = True,
                             x_title = "Time (s)",
                             y_title = "Fluorescence (au)")
-        
+
         for i, channel in enumerate(channels):
             try:
                 time = self.fpho_data_df['time' + channel[3:]]
@@ -897,16 +900,16 @@ class fiberObj:
             behaviorname = ""
             for j, beh in enumerate(behaviors):
                 behaviorname = behaviorname + " " + beh
-                temp_beh_string = ''.join([key for key in self.fpho_data_df[beh]])
+                temp_beh_string = ''.join(list(self.fpho_data_df[beh]))
                 pattern = re.compile(r'S[O]+E')
                 bouts = pattern.finditer(temp_beh_string)
                 for bout in bouts:
                     start_time = time.at[bout.start()]
                     end_time = time.at[bout.end()]
-                    fig.add_vrect(x0 = start_time, x1 = end_time, 
+                    fig.add_vrect(x0 = start_time, x1 = end_time,
                                 opacity = 0.75,
                                 layer = "below",
-                                line_width = 1, 
+                                line_width = 1,
                                 fillcolor = colors[j % 10],
                                 row = i + 1, col = 1,
                                 name = beh
@@ -915,16 +918,16 @@ class fiberObj:
                 starts = S.finditer(temp_beh_string)
                 for start in starts:
                     start_time = time.at[start.start()]
-                    fig.add_vline(x = start_time, 
+                    fig.add_vline(x = start_time,
                                 layer = "below",
-                                line_width = 3, 
+                                line_width = 3,
                                 line_color = colors[j % 10],
                                 row = i + 1, col = 1,
                                 name = beh
                                 )
-                
+
                 fig.add_annotation(xref = "x domain", yref = "y domain",
-                    x = 1, 
+                    x = 1,
                     y = (j + 1) / len(self.behaviors),
                     text = beh,
                     bgcolor = colors[j % 10],
@@ -932,18 +935,17 @@ class fiberObj:
                     row = i + 1, col = 1
                     )
         return fig
-        
-    
+
     def plot_PETS(self, channel, beh, time_before, time_after,
                     baseline = 0, base_option = 'Each event', show_first = 0,
                     show_last = -1, show_every = 1,
                     save_csv = False, percent_bool = False):
-        
+
         """
         Takes a dataframe and creates plot of the photometry data around
-        the start of each occurance of a behavior as well as average and 
+        the start of each occurance of a behavior as well as average and
         SEM of the data at all occurances. Stores results in dataframe.
-    
+
         Parameters
         ----------
         channel : string
@@ -968,7 +970,7 @@ class fiberObj:
             if true percent will be calculated as opposed to z-score
         save_csv: bool
             if true the dateframe used to create the graph will be saved in a csv file
-        
+
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
@@ -994,8 +996,7 @@ class fiberObj:
         fig = make_subplots(rows = 1, cols = 2,
                             subplot_titles = ('Full trace with events',
                                               'Average'
-                                             )
-                           )
+                                             ))
         # Adds trace
         fig.add_trace(
             # Scatter plot
@@ -1007,7 +1008,7 @@ class fiberObj:
             mode = "lines",
             line = go.scatter.Line(color="Green"),
             name = channel,
-            showlegend = False), 
+            showlegend = False),
             row = 1, col =1
             )
 
@@ -1015,28 +1016,28 @@ class fiberObj:
         PETS_data = pd.DataFrame()
         # Initialize events counter to 0
         n_events = 0
-        
+
         if base_option == 'Each event':
             base_mean = None
             base_std = None
             PETS_baseline = 'Each event'
-        
+
         elif base_option == 'Start of Sample':
             # idx = np.where((start_event_time > baseline[0]) & (start_event_time < baseline[1]))
             # Find baseline start/end index
-            # Start event time is the first occurrence of event, this option will be for a baseline at the beginning of the trace
+            # Start event time is the first occurrence of event,
+            #this option will be for a baseline at the beginning of the trace
             base_start_idx = full_time.searchsorted(
                 baseline[0])
             base_end_idx = full_time.searchsorted(
                 baseline[1])
             # Calc mean and std for values within window
             base_mean = np.nanmean(self.fpho_data_df.loc[
-                base_start_idx:base_end_idx, channel]) 
+                base_start_idx:base_end_idx, channel])
             base_std = np.nanstd(self.fpho_data_df.loc[
                 base_start_idx:base_end_idx, channel])
             PETS_baseline = 'From ' + str(baseline[0]) + ' to ' + str(baseline[1])
-            
-        
+
         elif base_option == 'End of Sample':
             # Indexes for finding baseline at end of sample
             start = max(baseline)
@@ -1070,18 +1071,20 @@ class fiberObj:
                 base_std = np.nanstd(self.fpho_data_df.loc[
                     base_start_idx:base_end_idx, channel])
 
-            # time - time_Before = start_time for this event trace, time is the actual event start, time before is secs input before event start
+            # time - time_Before = start_time for this event trace
+            #time is the actual event start, time before is secs input before event start
             # Finds time in our data that is closest to time - time_before
             # start_idx = index of that time
             start_idx = full_time.searchsorted(
                 time - time_before)
-            # time + time_after = end_time for this event trace, time is the actual event start, time after is secs input after event start
+            # time + time_after = end_time for this event trace
+            #time is the actual event start, time after is secs input after event start
             # end_idx = index of that time
             end_idx = full_time.searchsorted(
                 time + time_after)
-            
+
             # Edge case: If indexes are within bounds
-            if (start_idx > 0 and 
+            if (start_idx > 0 and
                 end_idx < len(full_time) - 1):
                 # Finds usable events
                 n_events = n_events + 1
@@ -1097,8 +1100,8 @@ class fiberObj:
                     this_time_series = self.zscore(trace, base_mean, base_std)
                     norm_type = 'Z-score'
                 # Adds each trace to a dict
-                PETS_data['event' + str(n_events)] = this_time_series 
-                
+                PETS_data['event' + str(n_events)] = this_time_series
+
                 if show_first == 0:
                     show_first = 1
                 if show_last == -1:
@@ -1115,15 +1118,15 @@ class fiberObj:
                     # Adds trace for each event
                     fig.add_trace(
                         # Scatter plot
-                        go.Scatter( 
+                        go.Scatter(
                         # Times starting at user input start time, ending at user input end time
                         x = time_clip - time,
-                        y = this_time_series, 
+                        y = this_time_series,
                         mode = "lines",
                         line = dict(color = trace_color, width = 2),
                         name = 'Event:' + str(n_events),
                         text = 'Event:' + str(n_events),
-                        showlegend=True), 
+                        showlegend=True),
                         row = 1, col = 2
                         )
 
@@ -1142,7 +1145,7 @@ class fiberObj:
         fig.add_vline(x = 0, line_dash = "dot", row = 1, col = 2)
         fig.add_trace(
             # Scatter plot
-            go.Scatter( 
+            go.Scatter(
             # Times for baseline window
             x = graph_time + graph_time[::-1],
             # Y = SEM
@@ -1158,7 +1161,7 @@ class fiberObj:
         # Adds trace
         fig.add_trace(
             # Scatter plot
-            go.Scatter( 
+            go.Scatter(
             # Times for baseline window
             x = graph_time,
             # Y = Average of all event traces
@@ -1173,9 +1176,9 @@ class fiberObj:
         #fig.update_yaxes(range = [.994, 1.004])
 
         fig.update_layout(
-            title = 'PETS plot of ' + beh + ' for ' 
+            title = 'PETS plot of ' + beh + ' for '
                     + self.obj_name + ' in channel ' + channel
-            )   
+            )
         fig.update_xaxes(title_text = 'Time (s)')
         fig.update_yaxes(title_text = 'Fluorescence (au)', col = 1, row = 1)
         fig.update_yaxes(title_text = norm_type, col = 2, row = 1)
@@ -1183,10 +1186,10 @@ class fiberObj:
         results = pd.DataFrame({'Object Name': [self.obj_name],
                                'Behavior': [beh], 'Channel' : [channel],
                                'Max value' : [max(avgerage)],
-                               'Time of max ' : [graph_time[np.argmax(avgerage)]], 
-                               'Min value': [min(avgerage)], 
+                               'Time of max ' : [graph_time[np.argmax(avgerage)]],
+                               'Min value': [min(avgerage)],
                                'Time of min' : [graph_time[np.argmin(avgerage)]],
-                               'range' : [max(avgerage) - min(avgerage)], 
+                               'range' : [max(avgerage) - min(avgerage)],
                                'Average value before event' : [np.mean(avgerage[:zero_idx])],
                                'Average value after event' : [np.mean(avgerage[zero_idx:])],
                                'Time before' : [time_before], 'Time after': [time_after],
@@ -1195,18 +1198,17 @@ class fiberObj:
         self.PETS_results = pd.concat([self.PETS_results, results])
         if save_csv:
             PETS_data.to_csv(self.obj_name + '_' + channel + '_' + beh +
-                               '_Baseline_' + PETS_baseline + '.csv') 
+                               '_Baseline_' + PETS_baseline + '.csv')
         return fig
-        
-        
+
     # Zscore calc helper
-    def zscore(self, ls, mean = None, std = None):
+    def zscore(self, data, mean = None, std = None):
         """
         Helper function to calculate z-scores
 
         Parameters
         ----------
-        ls : list
+        data : list
             time series data for one event
         mean : int/float, optional
             baseline mean value
@@ -1215,19 +1217,17 @@ class fiberObj:
 
         Returns
         ----------
-        new_ls : list
+        zscored_data : list
             zscore values of time series for an event
         """
         # Default Params, no arguments passed
         if mean is None and std is None:
-            mean = np.nanmean(ls)
-            std = np.nanstd(ls)
-        # Calculates zscore per event in list  
-        new_ls = [(i - mean) / std for i in ls]
-        return new_ls
-    
-        
-         #return the pearsons correlation coefficient and r value between 2 full channels and plots the signals overlaid and their scatter plot
+            mean = np.nanmean(data)
+            std = np.nanstd(data)
+        # Calculates zscore per event in list
+        zscored_data = [(i - mean) / std for i in data]
+        return zscored_data
+
     def pearsons_correlation(self, obj2, channel1, channel2, start_time, end_time):
         """
         Calculates the pearsons correlation coefficient for and plot the channels
@@ -1246,7 +1246,7 @@ class fiberObj:
             starting timestamp of data
         end_time : int
             ending timestamp of data
-            
+
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
@@ -1269,7 +1269,7 @@ class fiberObj:
         #find start
         if np.round(self.frame_rate) != np.round(self.frame_rate):
             print('These traces have different frame rates\n')
-            
+
         start_idx1 = np.searchsorted(time1, start_time)
         start_idx2 = np.searchsorted(time2, start_time)
 
@@ -1279,20 +1279,22 @@ class fiberObj:
             end_idx2 = len(time2)-1
         else:
             end_idx1 = np.searchsorted(time1, end_time)-1
-            end_idx2 = np.searchsorted(time2, end_time) -1 
+            end_idx2 = np.searchsorted(time2, end_time) -1
 
         if start_time - time1[start_idx1] < -1/self.frame_rate:
-            print('Trace 1 starts at ' + str(np.round(time1[start_idx1])) + 's after your start time ' + str(start_time) + '\n')
+            print('Trace 1 starts at ' + str(np.round(time1[start_idx1])) +
+                  's after your start time ' + str(start_time) + '\n')
         if end_time - time1[end_idx1] > 1/self.frame_rate:
-            print('Trace 1 ends at ' + str(np.round(time1[end_idx1])) + 's before your end time ' + str(end_time) + 's\n')
+            print('Trace 1 ends at ' + str(np.round(time1[end_idx1])) +
+                  's before your end time ' + str(end_time) + 's\n')
 
-        
         if start_time - time2[start_idx2] < -1/obj2.frame_rate:
-            print('Trace 2 starts at ' + str(np.round(time2[start_idx2])) + 's after your start time ' + str(start_time) + 's\n')
+            print('Trace 2 starts at ' + str(np.round(time2[start_idx2])) +
+                  's after your start time ' + str(start_time) + 's\n')
         if end_time - time2[end_idx2] > 1/obj2.frame_rate:
-            print('Trace 2 ends at ' + str(np.round(time2[end_idx2])) + 's before your end time ' + str(end_time) + 's\n')
+            print('Trace 2 ends at ' + str(np.round(time2[end_idx2])) +
+                  's before your end time ' + str(end_time) + 's\n')
 
-        
         sig1 = self.fpho_data_df.loc[start_idx1:end_idx1, channel1]
         sig2 = obj2.fpho_data_df.loc[start_idx2:end_idx2, channel2]
         crop_time1 = time1[start_idx1:end_idx1]
@@ -1329,10 +1331,8 @@ class fiberObj:
             showlegend = False),
             row = 1, col = 1
             )
-    
-        #make traces the same length for correlation 
-        shorter_len = min(len(sig1), len(sig2)) 
-        #calculates the pearsons R  
+
+        #calculates the pearsons R
         [r, p] = ss.pearsonr(sig1, sig2)
         res = ss.linregress(sig1, sig2)
                 #plots sig2
@@ -1347,12 +1347,12 @@ class fiberObj:
             row = 1, col = 2
             )
         results = pd.DataFrame({'Object Name': [self.obj_name], 'Channel' : [channel1],
-                                'Obj2': [obj2.obj_name], 'Obj2 Channel': [channel2], 
-                                'start_time' : [start_time], 'end_time' : [end_time], 
+                                'Obj2': [obj2.obj_name], 'Obj2 Channel': [channel2],
+                                'start_time' : [start_time], 'end_time' : [end_time],
                                 'R Score' : [str(r)], 'p score': [str(p)]})
         self.correlation_results = pd.concat([self.correlation_results, results])
         fig.update_layout(
-            title = 'Correlation between ' + self.obj_name + ' and ' 
+            title = 'Correlation between ' + self.obj_name + ' and '
                   + obj2.obj_name + ' is, ' + str(r) + ' p = ' + str(p)
             )
         fig.update_xaxes(title_text = self.obj_name + " " + channel1, col = 2, row = 1)
@@ -1360,7 +1360,6 @@ class fiberObj:
         fig.update_xaxes(title_text = 'Time (s)', col = 1, row = 1)
         fig.update_yaxes(title_text = 'Fluorescence (au)', col = 1, row = 1)
         return fig
-        
 
     def behavior_specific_pearsons(self, obj2, channel1, channel2, beh):
         """
@@ -1379,25 +1378,24 @@ class fiberObj:
             key of the signal selected for the first object
         beh : str
             key of the behavior
-            
+
         Returns
         ----------
         fig : plotly.graph_objects.Scatter
             Plots of both signal against time and the signals against eachother
         """
-        
-        # behaviorSlice=df.loc[:,beh]
-        behaviorSlice1 = self.fpho_data_df[self.fpho_data_df[beh] != ' ']
-        behaviorSlice2 = obj2.fpho_data_df[self.fpho_data_df[beh] != ' ']
+
+        behavior_slice1 = self.fpho_data_df[self.fpho_data_df[beh] != ' ']
+        behavior_slice2 = obj2.fpho_data_df[self.fpho_data_df[beh] != ' ']
         try:
-            time = behaviorSlice1['time' + channel1[3:]]
+            time = behavior_slice1['time' + channel1[3:]]
         except KeyError:
             try:
-                time = behaviorSlice1['time' + channel1[9:]]
+                time = behavior_slice1['time' + channel1[9:]]
             except KeyError:
-                time = behaviorSlice1['time']
-        sig1 = behaviorSlice1[channel1]
-        sig2 = behaviorSlice2[channel2]
+                time = behavior_slice1['time']
+        sig1 = behavior_slice1[channel1]
+        sig2 = behavior_slice2[channel2]
         fig = make_subplots(rows = 1, cols = 2)
         fig.add_trace(
             go.Scattergl(
@@ -1405,7 +1403,7 @@ class fiberObj:
             y = sig2,
             mode = "markers",
             name = beh,
-            showlegend = False), 
+            showlegend = False),
             row = 1, col = 2
             )
         fig.add_trace(
@@ -1428,10 +1426,10 @@ class fiberObj:
             row = 1, col = 1
             )
 
-        [r, p] = ss.pearsonr(sig1, sig2) # 'r' and 'p' were both being referenced before assignment
+        [r, p] = ss.pearsonr(sig1, sig2)
 
         fig.update_layout(
-                title = 'Correlation between ' + self.obj_name + ' and ' 
+                title = 'Correlation between ' + self.obj_name + ' and '
                   + obj2.obj_name + ' during ' + beh + ' is, ' + str(r) + ' p = ' + str(p)
                 )
         fig.update_xaxes(title_text = self.obj_name + " " + channel1, col = 2, row = 1)
@@ -1446,10 +1444,10 @@ class fiberObj:
                    'Behavior' : [beh],
                    'Number of Events': [self.fpho_data_df[beh].value_counts()['S']],
                    'R Score' : [r], 'p score': [p]})
-        self.beh_corr_results = pd.concat([self.beh_corr_results, results])       
-        
+        self.beh_corr_results = pd.concat([self.beh_corr_results, results])
+
         return fig
-    
+
 ##### End Class Functions #####
 
 def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
@@ -1467,7 +1465,7 @@ def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
         value in the .csv file that signifies when a behavior
         is not occuring
     time_between_bouts : float
-        The minumum time between behavioral epochs 
+        The minumum time between behavioral epochs
         that qualifies as two different bouts
 
     Returns
@@ -1489,12 +1487,12 @@ def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
 
         for i, v in enumerate(diffs):
             if v > (time_between_bouts / conversion_to_sec):
-                stops.concat((trimmed.iloc[i]['Time'] 
+                stops.concat((trimmed.iloc[i]['Time']
                               - beh_file.iloc[0]['Time']) * conversion_to_sec)
                 if i+1 < len(diffs):
-                    starts.concat((trimmed.iloc[i+1]['Time'] 
+                    starts.concat((trimmed.iloc[i+1]['Time']
                                    - beh_file.iloc[0]['Time']) * conversion_to_sec)
-        stops.concat((trimmed.iloc[-1]['Time'] 
+        stops.concat((trimmed.iloc[-1]['Time']
                       - beh_file.iloc[0]['Time']) * conversion_to_sec)
 
         time = starts + stops
