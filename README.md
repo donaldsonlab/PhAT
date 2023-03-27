@@ -1,5 +1,8 @@
 # Fiber Photometry GUI by CU Boulder's Donaldson Lab
 
+**A detailed protocol for the installation, use and modifcation of this software can be found on bioRxiv at: https://www.biorxiv.org/content/10.1101/2023.03.14.532489v1.full**
+
+
 ## Installation Instructions
 
 **New Users: Follow the instructions below to install the GUI**
