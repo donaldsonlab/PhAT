@@ -1,10 +1,16 @@
 Commands to run tests: 
-// Keep in mind whether you're in the tests directory or not
+# Keep in mind whether you're in the tests directory or not
 
+# These are different types of tests you may run on the files
+# Each test checks for different things and gives different types of results
+# This is just for thoroughness
+# Unittest library
 Unittest - python3 -m unittest tests/~file_name~
-Pytest - pytest tests/
-Pytest Coverage - python3 -m pytest -cov=tests/
 Coverage run all tests - coverage run -m --source=. unittest discover
 Coverage Report - coverage report -m
 HTML Report - coverage html
 - Open "htmlcov/index.html" in browser
+
+# Pytest library
+Pytest - pytest tests/
+Pytest Coverage - python3 -m pytest -cov=tests/
