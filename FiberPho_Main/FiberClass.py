@@ -274,7 +274,7 @@ class FiberObj:
         except:
             print('no isosbestic data found')
 
-        shortest_len = min(len(channels) for channels in data_dict.items())
+        shortest_list = min(len(channels) for channels in data_dict.values())
         for channel in data_dict:
             data_dict[channel] = data_dict[channel][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
