@@ -813,7 +813,7 @@ class FiberObj:
         --------
         None
         """
-        beh_data = beh_data.sort_values('Time')
+        beh_data = beh_data.sort_values(by = 'Time', kind = 'stable')
         unique_behaviors = beh_data['Behavior'].unique()
         for beh in unique_behaviors:
             if beh in self.fpho_data_df.columns:
@@ -821,8 +821,7 @@ class FiberObj:
                       ' and cannot be added again.')
             else:
                 self.behaviors.add(beh)
-                idx_of_beh = [i for i in range(len(beh_data['Behavior']
-                             )) if beh_data.loc[i, 'Behavior'] == beh]
+                idx_of_beh = beh_data.index[beh_data['Behavior'] == beh].tolist()
                 j = 0
                 self.fpho_data_df[beh] = ' '
                 while j < len(idx_of_beh):
@@ -844,8 +843,8 @@ class FiberObj:
                         j = j + 2
                     else:
                         print("\nStart and stops for state behavior:"
-                              + beh + " are not paired correctly.\n")
-                        sys.exit()
+                             + beh + " are not paired correctly.\n")
+                        j = j + 1
         if self.beh_filename == 'N/A':
             self.beh_filename = filename
         else:
@@ -1478,7 +1477,6 @@ def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
     conversion_to_sec = conversion_dict[time_unit]
     behaviors = list(beh_file.columns)
     behaviors.remove('Time')
-    print(behaviors)
     for beh in behaviors:
         trimmed = beh_file[beh_file[beh] != beh_false]
         starts = [(trimmed.iloc[0]['Time'] - beh_file.iloc[0]['Time']) * conversion_to_sec]
@@ -1487,21 +1485,19 @@ def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
 
         for i, v in enumerate(diffs):
             if v > (time_between_bouts / conversion_to_sec):
-                stops.concat((trimmed.iloc[i]['Time']
+                stops.append((trimmed.iloc[i]['Time']
                               - beh_file.iloc[0]['Time']) * conversion_to_sec)
-                if i+1 < len(diffs):
-                    starts.concat((trimmed.iloc[i+1]['Time']
+                if i < len(diffs):
+                    starts.append((trimmed.iloc[i+1]['Time']
                                    - beh_file.iloc[0]['Time']) * conversion_to_sec)
-        stops.concat((trimmed.iloc[-1]['Time']
+        stops.append((trimmed.iloc[-1]['Time']
                       - beh_file.iloc[0]['Time']) * conversion_to_sec)
 
-        time = starts + stops
-        time.sort()
-        status = ['START'] * len(time)
-        half = len(time) / 2
-        status[1::2] = ['STOP'] * int(half)
-        behavior = [beh] * len(time)
-        beh_df = pd.DataFrame(data = {'Time': time, 'Behavior': behavior, 'Status' : status})
+        starts_df = pd.DataFrame(data = {'Time': starts, 'Behavior': [beh]*len(starts), 'Status' : ['START']*len(starts)})
+        stops_df = pd.DataFrame(data = {'Time': stops, 'Behavior': [beh]*len(stops), 'Status' : ['STOP']*len(stops)})
+        beh_df =  pd.concat([starts_df, stops_df])
+        beh_df = beh_df.sort_values(by = 'Time', kind = 'stable')
         boris_df = pd.concat([boris_df, beh_df])
-    boris_df.sort_values(by = 'Time')
+    boris_df = boris_df.sort_values(by = 'Time', kind = 'stable')
+    boris_df.reset_index(inplace=True, drop=True)
     return boris_df
