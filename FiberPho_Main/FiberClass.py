@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import panel as pn
 import scipy.stats as ss
+import scipy.integrate as integrate
 import plotly.graph_objects as go
 from scipy.optimize import curve_fit
 from plotly.subplots import make_subplots
@@ -116,9 +117,10 @@ class FiberObj:
         self.PETS_results = pd.DataFrame(columns = ['Object Name', 'Behavior',
                                                     'Channel', 'range',
                                                     'Max value',
-                                                    'Time of max value',
+                                                    'Time of max',
                                                     'Min value',
-                                                    'Time of min value',
+                                                    'Time of min',
+                                                    'AUC'
                                                     'Average value before event',
                                                     'Average value after event',
                                                     'Time before', 'Time after',
@@ -396,9 +398,10 @@ class FiberObj:
         self.PETS_results = pd.DataFrame(columns = ['Object Name', 'Behavior',
                                                     'Channel', 'range',
                                                     'Max value',
-                                                    'Time of max value',
+                                                    'Time of max',
                                                     'Min value',
-                                                    'Time of min value',
+                                                    'Time of min',
+                                                    'AUC'
                                                     'Average value before event',
                                                     'Average value after event',
                                                     'Time before', 'Time after',
@@ -1188,6 +1191,7 @@ class FiberObj:
                                'Time of max ' : [graph_time[np.argmax(avgerage)]],
                                'Min value': [min(avgerage)],
                                'Time of min' : [graph_time[np.argmin(avgerage)]],
+                               'AUC' : [integrate.simpson(average[zero_idx:],graph_time[zero_idx:])],
                                'range' : [max(avgerage) - min(avgerage)],
                                'Average value before event' : [np.mean(avgerage[:zero_idx])],
                                'Average value after event' : [np.mean(avgerage[zero_idx:])],
