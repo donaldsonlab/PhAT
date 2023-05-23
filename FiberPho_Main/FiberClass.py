@@ -4,10 +4,12 @@ import pandas as pd
 import numpy as np
 import panel as pn
 import scipy.stats as ss
+import scipy.signal as sci_sig
 import scipy.integrate as integrate
 import plotly.graph_objects as go
 from scipy.optimize import curve_fit
 from plotly.subplots import make_subplots
+
 
 
 pn.extension('terminal')
@@ -326,6 +328,42 @@ class FiberObj:
         data = np.array(data)
 
         return a * data + b
+    def save_data_to_csv(self, df, csv_name):
+        """
+        Takes in a DataFrame and a name
+        then saves the DataFrame as a csv file
+        with the name and appends a suffix if
+        necessary to avoid overwriting.
+
+        Parameters
+        ----------
+        time : list
+            time values of you photometry data
+        a : float
+            slope coefficient used to linearly transform data
+        b: float
+            intercept coefficient used to linearly transform data
+
+        Returns
+        ----------
+        np.array
+            data linearly transformed
+        """
+        not_saved = True
+        try:
+            df.to_csv(csv_name + '.csv', mode = 'x')
+            not_saved = False
+        except:
+            copy = 1
+        while not_saved:
+            try:
+                df.to_csv(csv_name + '(' + str(copy) + ').csv')
+                print(csv_name + '(' + str(copy) + ').csv saved')
+                not_saved = False
+            except:
+                copy = copy + 1
+        return
+
 #### End Helper Functions ####
 ##### Class Functions #####
     def combine_objs(self, obj2, new_obj_name, combine_type, time_adj):
@@ -816,6 +854,7 @@ class FiberObj:
         --------
         None
         """
+
         beh_data = beh_data.sort_values(by = 'Time', kind = 'stable')
         unique_behaviors = beh_data['Behavior'].unique()
         for beh in unique_behaviors:
@@ -868,75 +907,93 @@ class FiberObj:
 
         Returns
         ----------
-        fig : plotly.graph_objects.Scatter
-            Scatter plot of photometry signal with behavior data
-            overlaid as colored rectangles
+        fig : list
+            list of plotly.graph_objects.Scatter
+            Scatter plot of photometry signal with
+            behavior data overlaid as colored rectangles
         """
 
-        fig = make_subplots(rows = len(channels), cols = 1,
-                            subplot_titles = list(channels),
-                            shared_xaxes = True,
-                            x_title = "Time (s)",
-                            y_title = "Fluorescence (au)")
-
-        for i, channel in enumerate(channels):
-            try:
-                time = self.fpho_data_df['time' + channel[3:]]
-            except KeyError:
-                try:
-                    time = self.fpho_data_df['time' + channel[9:]]
-                except KeyError:
-                    time = self.fpho_data_df['time']
-            fig.add_trace(
-                go.Scatter(
-                x = time,
-                y = self.fpho_data_df[channel],
-                mode = "lines",
-                line = go.scatter.Line(color = "Green"),
-                name = channel,
-                showlegend = False), row = i + 1, col = 1
-                )
-            colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A',
-                      '#19D3F3', '#FF6692', '#B6E880', '#FF97FF', '#FECB52']
-            j = 0
-            behaviorname = ""
-            for j, beh in enumerate(behaviors):
-                behaviorname = behaviorname + " " + beh
+        behavior_colors = {behavior: color for behavior, color in zip(
+            behaviors, ['#02F2C2', '#0D85FD', '#C221FD', '#FF4CD2', '#FB0E59', 
+                        '#FD8059', '#FFF159', '#69FF70', '#A162FF', '#626562'])}
+        try:
+            time_key = 'time' + (channels[0][3:] if channels[0].startswith('data') else channels[0][9:])
+            time = self.fpho_data_df[time_key]
+        except KeyError:
+            time = self.fpho_data_df['time']
+        start_lines = []
+        bout_rects = []
+        beh_labels = []
+        for i, beh in enumerate(behaviors):
+                behavior_color = behavior_colors[beh]
                 temp_beh_string = ''.join(list(self.fpho_data_df[beh]))
+                #Find starts and create lines to add to graphs
+                S = re.compile(r'S')
+                starts = S.finditer(temp_beh_string)
+                for start in starts:
+                    start_time = time.at[start.start()]
+                    vertical_line = dict(
+                        type="line",
+                        xref="x",
+                        yref="paper",
+                        x0=start_time,
+                        x1=start_time,
+                        y0=0,
+                        y1=1,
+                        line=dict(width=2, color=behavior_color),
+                        layer="below"
+                    )
+                    start_lines.append(vertical_line)
+                #Find bouts and create rectangles to add to graphs
                 pattern = re.compile(r'S[O]+E')
                 bouts = pattern.finditer(temp_beh_string)
                 for bout in bouts:
                     start_time = time.at[bout.start()]
                     end_time = time.at[bout.end()]
-                    fig.add_vrect(x0 = start_time, x1 = end_time,
-                                opacity = 0.75,
-                                layer = "below",
-                                line_width = 1,
-                                fillcolor = colors[j % 10],
-                                row = i + 1, col = 1,
-                                name = beh
-                                )
-                S = re.compile(r'S')
-                starts = S.finditer(temp_beh_string)
-                for start in starts:
-                    start_time = time.at[start.start()]
-                    fig.add_vline(x = start_time,
-                                layer = "below",
-                                line_width = 3,
-                                line_color = colors[j % 10],
-                                row = i + 1, col = 1,
-                                name = beh
-                                )
+                    rectangle = dict(
+                        type="rect",
+                        xref="x",
+                        yref="paper",
+                        x0=start_time,
+                        y0=0,
+                        x1=end_time,
+                        y1=1,
+                        fillcolor=behavior_color,
+                        opacity=0.5,
+                        line=dict(width=0),
+                        layer="below")
+                    bout_rects.append(rectangle)
+                #create an annotation for each behavior
+                behavior_color = behavior_colors[beh]
+                annotation = dict(
+                    xref="paper",
+                    yref="paper",
+                    x=1,
+                    y=1 - i/len(behaviors),
+                    text=beh,
+                    bgcolor=behavior_color,
+                    showarrow = False
+                )
+                beh_labels.append(annotation)
 
-                fig.add_annotation(xref = "x domain", yref = "y domain",
-                    x = 1,
-                    y = (j + 1) / len(self.behaviors),
-                    text = beh,
-                    bgcolor = colors[j % 10],
-                    showarrow = False,
-                    row = i + 1, col = 1
-                    )
-        return fig
+        figs = []            
+        for i, channel in enumerate(channels):
+            fig = go.Figure()
+            fig.update_layout(shapes = bout_rects + start_lines, annotations = beh_labels, title = self.obj_name + ' ' + channel)
+            fig.update_xaxes(title_text = 'Time (s)', showgrid = False)
+            fig.update_yaxes(title_text = 'Fluorescence (au)')
+            fig.add_trace(
+                go.Scatter(
+                    x=time,
+                    y=self.fpho_data_df[channel],
+                    mode="lines",
+                    line=go.scatter.Line(color="Black"),
+                    name=channel,
+                    showlegend=False)
+            )
+            fig.show()
+            figs.append(fig)
+        return figs
 
     def plot_PETS(self, channel, beh, time_before, time_after,
                     baseline = 0, base_option = 'Each event', show_first = 0,
@@ -1200,8 +1257,8 @@ class FiberObj:
                                'Normalization type' : [norm_type]})
         self.PETS_results = pd.concat([self.PETS_results, results])
         if save_csv:
-            PETS_data.to_csv(self.obj_name + '_' + channel + '_' + beh +
-                               '_Baseline_' + PETS_baseline + '.csv')
+            csv_name = self.obj_name + '_' + channel + '_' + beh + '_Baseline_' + PETS_baseline
+            self.save_data_to_csv(PETS_data, csv_name)
         return fig
 
     # Zscore calc helper
@@ -1230,6 +1287,55 @@ class FiberObj:
         # Calculates zscore per event in list
         zscored_data = [(i - mean) / std for i in data]
         return zscored_data
+
+    def peak_finding(self, channel, start_time, end_time, peak_widths, save_data):
+        start_size = peak_widths[0]/self.frame_rate
+        stop_size = peak_widths[1]/self.frame_rate
+        try:
+            time = self.fpho_data_df['time' + channel[3:]]
+        except KeyError:
+            try:
+                time = self.fpho_data_df['time' + channel[9:]]
+            except KeyError:
+                time = self.fpho_data_df['time']
+        start_idx = np.searchsorted(time, start_time)
+        if end_time == -1:
+            end_idx = len(time)-1
+        else:
+            end_idx = np.searchsorted(time, end_time)
+        time = time[start_idx:end_idx]
+        data = self.fpho_data_df.loc[start_idx:end_idx, channel]
+        peaks = sci_sig.find_peaks_cwt(data, np.arange(start_size, stop_size))
+        peak_times = [time[idx] for idx in peaks]
+        peak_heights = [data[idx] for idx in peaks]
+        peak_data = pd.DataFrame({'Time':peak_times, 'Peak Height': peak_heights})
+        fig = go.Figure()
+        #plots data
+        fig.add_trace(
+            go.Scattergl(
+            x = time,
+            y = data,
+            mode = "lines",
+            line = dict(color = 'green', width = 2),
+            name = channel,
+            showlegend = True)
+        )
+        #plots peaks
+        fig.add_trace(
+            go.Scattergl(
+            x = peak_times,
+            y = peak_heights,
+            mode = "markers",
+            marker = dict(color = 'black', size=5, symbol="cross"),
+            name = "peaks",
+            showlegend = True)
+        )
+        fig.show()
+        if save_data:
+            csv_name = self.obj_name + '_' + channel + 'from' + str(start_time) + 'to' + str(end_time)
+            self.save_data_to_csv(peak_data, csv_name)
+        return fig
+
 
     def pearsons_correlation(self, obj2, channel1, channel2, start_time, end_time):
         """
