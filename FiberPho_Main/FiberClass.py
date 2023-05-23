@@ -108,9 +108,12 @@ class FiberObj:
         self.sig_fit_coefficients = ''
         self.ref_fit_coefficients = ''
         self.sig_to_ref_coefficients = ''
-        self.version = 3 #only variable names have changed since version 1 and 2
+        self.version = 4 #variable names have changed since version 1 and 2
         #out of date objs can be updated by updating attribute variable names
         #file_name -> filename, startIdx -> start_idx, endIdx -> end_idx
+        #From versions 3-4 a peak_results DataFrarme was added. 
+        #This will only impact the peak finding module.
+        #You can update this by adding a the Adding the DataFrame below
         self.color_dict = {'Raw_Green' : 'LawnGreen', 'Raw_Red': 'Red',
                            'Raw_Isosbestic': 'Cyan',
                            'Normalized_Green': 'MediumSeaGreen',
@@ -128,6 +131,15 @@ class FiberObj:
                                                     'Time before', 'Time after',
                                                     'Number of events', 'Baseline',
                                                     'Normalization type'])
+        self.peak_results = pd.DataFrame(columns = ['Object Name',
+                                                    'Channel',
+                                                    'Start time',
+                                                    'End time',
+                                                    'Width range entered'
+                                                    'Number of peaks',
+                                                    'Average peak amplitude',
+                                                    'Average trace amplitude'
+                                                    'Frequency of peaks (peaks/s)'])
         self.correlation_results = pd.DataFrame(columns = ['Object Name', 'Channel',
                                                            'Obj2', 'Obj2 Channel',
                                                            'start_time', 'end_time',
@@ -976,7 +988,7 @@ class FiberObj:
                 )
                 beh_labels.append(annotation)
 
-        figs = []            
+        figs = []
         for i, channel in enumerate(channels):
             fig = go.Figure()
             fig.update_layout(shapes = bout_rects + start_lines, annotations = beh_labels, title = self.obj_name + ' ' + channel)
@@ -1189,12 +1201,12 @@ class FiberObj:
                         row = 1, col = 2
                         )
 
-        avgerage = PETS_data.mean(axis=1).to_list()
+        average = PETS_data.mean(axis=1).to_list()
         sem = PETS_data.sem(axis=1).to_list()
         graph_time = np.linspace(-time_before, time_after,
-                                 num = len(avgerage)).tolist()
+                                 num = len(average)).tolist()
         PETS_data.insert(0, 'time', graph_time)
-        PETS_data.insert(1, 'Average', avgerage)
+        PETS_data.insert(1, 'Average', average)
         PETS_data.insert(2, 'SEM', sem)
         PETS_data.insert(3, 'SEM Upper Bound', PETS_data['Average'] + PETS_data['SEM'])
         PETS_data.insert(4, 'SEM Lower Bound', PETS_data['Average'] - PETS_data['SEM'])
@@ -1224,7 +1236,7 @@ class FiberObj:
             # Times for baseline window
             x = graph_time,
             # Y = Average of all event traces
-            y = avgerage,
+            y = average,
             mode = "lines",
             line = dict(color = "Black", width = 5),
             name = 'average',
@@ -1244,14 +1256,14 @@ class FiberObj:
 
         results = pd.DataFrame({'Object Name': [self.obj_name],
                                'Behavior': [beh], 'Channel' : [channel],
-                               'Max value' : [max(avgerage)],
-                               'Time of max ' : [graph_time[np.argmax(avgerage)]],
-                               'Min value': [min(avgerage)],
-                               'Time of min' : [graph_time[np.argmin(avgerage)]],
+                               'Max value' : [max(average)],
+                               'Time of max ' : [graph_time[np.argmax(average)]],
+                               'Min value': [min(average)],
+                               'Time of min' : [graph_time[np.argmin(average)]],
                                'AUC' : [integrate.simpson(average[zero_idx:],graph_time[zero_idx:])],
-                               'range' : [max(avgerage) - min(avgerage)],
-                               'Average value before event' : [np.mean(avgerage[:zero_idx])],
-                               'Average value after event' : [np.mean(avgerage[zero_idx:])],
+                               'range' : [max(average) - min(average)],
+                               'Average value before event' : [np.mean(average[:zero_idx])],
+                               'Average value after event' : [np.mean(average[zero_idx:])],
                                'Time before' : [time_before], 'Time after': [time_after],
                                'Number of events' : [n_events], 'Baseline' : [PETS_baseline],
                                'Normalization type' : [norm_type]})
@@ -1303,12 +1315,21 @@ class FiberObj:
             end_idx = len(time)-1
         else:
             end_idx = np.searchsorted(time, end_time)
-        time = time[start_idx:end_idx]
-        data = self.fpho_data_df.loc[start_idx:end_idx, channel]
+        time = time[start_idx:end_idx].reset_index(drop = True)
+        data = self.fpho_data_df.loc[start_idx:end_idx, channel].reset_index(drop = True)
         peaks = sci_sig.find_peaks_cwt(data, np.arange(start_size, stop_size))
-        peak_times = [time[idx] for idx in peaks]
-        peak_heights = [data[idx] for idx in peaks]
+
+        #clean up the peaks a bit
+        min_distance_between_peaks = min(peaks[i+1] - peaks[i] for i in range(len(peaks) - 1))
+        half_min = int(min_distance_between_peaks/2)
+        adj_peaks = []
+        for peak in peaks:
+            real_peak = data.loc[peak-half_min:peak+half_min].idxmax()
+            adj_peaks.append(real_peak)
+        peak_times = [time[idx] for idx in adj_peaks]
+        peak_heights = [data[idx] for idx in adj_peaks]
         peak_data = pd.DataFrame({'Time':peak_times, 'Peak Height': peak_heights})
+
         fig = go.Figure()
         #plots data
         fig.add_trace(
@@ -1331,11 +1352,23 @@ class FiberObj:
             showlegend = True)
         )
         fig.show()
+        results = pd.DataFrame({'Object Name': [self.obj_name],
+                       'Channel' : [channel],
+                       'Start time' : [time.iloc[0]],
+                       'End time' : [time.iloc[-1]],
+                       'Width range entered': [peak_widths],
+                       'Number of peaks' : [len(peaks)],
+                       'Average peak amplitude' : [np.mean(peak_heights)],
+                       'Average trace amplitude' : [np.mean(data)],
+                       'Frequency of peaks (peaks/s)' : [len(peaks)/(time.iloc[-1]-time.iloc[0])]})
+        try:
+            self.peak_results = pd.concat([self.peak_results, results])
+        except AttributeError:
+            self.peak_results = results
         if save_data:
             csv_name = self.obj_name + '_' + channel + 'from' + str(start_time) + 'to' + str(end_time)
             self.save_data_to_csv(peak_data, csv_name)
         return fig
-
 
     def pearsons_correlation(self, obj2, channel1, channel2, start_time, end_time):
         """
