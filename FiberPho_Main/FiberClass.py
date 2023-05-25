@@ -1132,12 +1132,12 @@ class FiberObj:
                         row = 1, col = 2
                         )
 
-        avgerage = PETS_data.mean(axis=1).to_list()
+        average = PETS_data.mean(axis=1).to_list()
         sem = PETS_data.sem(axis=1).to_list()
         graph_time = np.linspace(-time_before, time_after,
-                                 num = len(avgerage)).tolist()
+                                 num = len(average)).tolist()
         PETS_data.insert(0, 'time', graph_time)
-        PETS_data.insert(1, 'Average', avgerage)
+        PETS_data.insert(1, 'Average', average)
         PETS_data.insert(2, 'SEM', sem)
         PETS_data.insert(3, 'SEM Upper Bound', PETS_data['Average'] + PETS_data['SEM'])
         PETS_data.insert(4, 'SEM Lower Bound', PETS_data['Average'] - PETS_data['SEM'])
@@ -1167,7 +1167,7 @@ class FiberObj:
             # Times for baseline window
             x = graph_time,
             # Y = Average of all event traces
-            y = avgerage,
+            y = average,
             mode = "lines",
             line = dict(color = "Black", width = 5),
             name = 'average',
@@ -1187,14 +1187,14 @@ class FiberObj:
 
         results = pd.DataFrame({'Object Name': [self.obj_name],
                                'Behavior': [beh], 'Channel' : [channel],
-                               'Max value' : [max(avgerage)],
-                               'Time of max ' : [graph_time[np.argmax(avgerage)]],
-                               'Min value': [min(avgerage)],
-                               'Time of min' : [graph_time[np.argmin(avgerage)]],
+                               'Max value' : [max(average)],
+                               'Time of max ' : [graph_time[np.argmax(average)]],
+                               'Min value': [min(average)],
+                               'Time of min' : [graph_time[np.argmin(average)]],
                                'AUC' : [integrate.simpson(average[zero_idx:],graph_time[zero_idx:])],
-                               'range' : [max(avgerage) - min(avgerage)],
-                               'Average value before event' : [np.mean(avgerage[:zero_idx])],
-                               'Average value after event' : [np.mean(avgerage[zero_idx:])],
+                               'range' : [max(average) - min(average)],
+                               'Average value before event' : [np.mean(average[:zero_idx])],
+                               'Average value after event' : [np.mean(average[zero_idx:])],
                                'Time before' : [time_before], 'Time after': [time_after],
                                'Number of events' : [n_events], 'Baseline' : [PETS_baseline],
                                'Normalization type' : [norm_type]})
