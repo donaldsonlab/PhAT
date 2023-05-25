@@ -637,13 +637,13 @@ class FiberObj:
             fig = make_subplots(rows = 3, cols = 2, x_title = 'Time(s)',
                                 y_title = 'Flourescence (au)',
                                 subplot_titles=("Biexponential Fitted to Signal (R^2 = " +
-                                                str(sig_r_square) + ")",
+                                                str(np.round(sig_r_square, 3)) + ")",
                                                 "Signal Normalized to Biexponential",
                                                 "Biexponential Fitted to Ref (R^2 = " +
-                                                str(ref_r_square) + ")",
+                                                str(np.round(ref_r_square, 3)) + ")",
                                                 "Reference Normalized to Biexponential",
                                                 "Reference Linearly Fitted to Signal(R = " +
-                                                str(lin_r) + ")",
+                                                str(np.round(lin_r, 3)) + ")",
                                                 "Final Normalized Signal"),
                                 shared_xaxes = True, vertical_spacing = 0.1)
             fig.add_trace(
@@ -654,7 +654,7 @@ class FiberObj:
                 line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
                 name ='Signal:' + signal,
                 text = 'Signal',
-                showlegend = True),
+                showlegend = False),
                 row = 1, col = 1
                 )
             fig.add_trace(
@@ -665,7 +665,7 @@ class FiberObj:
                 line = go.scatter.Line(color="Purple"),
                 name = 'Biexponential fitted to Signal',
                 text = 'Biexponential fitted to Signal',
-                showlegend = True),
+                showlegend = False),
                 row = 1, col = 1
                 )
             fig.add_trace(
@@ -676,7 +676,7 @@ class FiberObj:
                 line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
                 name = 'Signal Normalized to Biexponential',
                 text = 'Signal Normalized to Biexponential',
-                showlegend = True),
+                showlegend = False),
                 row = 1, col = 2
                 )
             fig.add_trace(
@@ -687,7 +687,7 @@ class FiberObj:
                 line = go.scatter.Line(color="Cyan"),
                 name = 'Reference:' + reference,
                 text = 'Reference',
-                showlegend = True),
+                showlegend = False),
                 row = 2, col = 1
                 )
             fig.add_trace(
@@ -698,7 +698,7 @@ class FiberObj:
                 line = go.scatter.Line(color="Purple"),
                 name = 'Biexponential fit to Reference',
                 text = 'Biexponential fit to Reference',
-                showlegend = True),
+                showlegend = False),
                 row = 2, col = 1
                 )
             fig.add_trace(
@@ -709,7 +709,7 @@ class FiberObj:
                 line = go.scatter.Line(color="Cyan"),
                 name = 'Reference Normalized to Biexponential',
                 text = 'Reference Normalized to Biexponential',
-                showlegend = True),
+                showlegend = False),
                 row = 2, col = 2
                 )
             fig.add_trace(
@@ -720,7 +720,7 @@ class FiberObj:
                 line = go.scatter.Line(color="Cyan"),
                 name = 'Reference linearly scaled to signal',
                 text = 'Reference linearly scaled to signal',
-                showlegend = True),
+                showlegend = False),
                 row = 3, col = 1
                 )
             fig.add_trace(
@@ -731,7 +731,7 @@ class FiberObj:
                 line = go.scatter.Line(color="rgba(0, 255, 0, 0.5)"),
                 name = 'Signal Normalized to Biexponential',
                 text = 'Signal Normalized to Biexponential',
-                showlegend = True),
+                showlegend = False),
                 row = 3, col = 1
                 )
             fig.add_trace(
@@ -742,7 +742,7 @@ class FiberObj:
                 line = go.scatter.Line(color = "Hot Pink"),
                 name = 'Final Normalized Signal',
                 text = 'Final Normalized Signal',
-                showlegend = True),
+                showlegend = False),
                 row = 3, col = 2
                 )
         else:
@@ -763,7 +763,7 @@ class FiberObj:
                 line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
                 name ='Signal:' + signal,
                 text = 'Signal',
-                showlegend = True),
+                showlegend = False),
                 row = 1, col = 1
                 )
             fig.add_trace(
@@ -774,7 +774,7 @@ class FiberObj:
                 line = go.scatter.Line(color="Purple"),
                 name = 'Biexponential fitted to Signal',
                 text = 'Biexponential fitted to Signal',
-                showlegend = True),
+                showlegend = False),
                 row = 1, col = 1
                 )
             fig.add_trace(
@@ -785,7 +785,7 @@ class FiberObj:
                 line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
                 name = 'Signal Normalized to Biexponential',
                 text = 'Signal Normalized to Biexponential',
-                showlegend = True),
+                showlegend = False),
                 row = 1, col = 2
                 )
 
