@@ -924,10 +924,14 @@ class FiberObj:
             Scatter plot of photometry signal with
             behavior data overlaid as colored rectangles
         """
+        colors = ['#02F2C2', '#0D85FD', '#C221FD', '#FF4CD2', '#FB0E59',
+                  '#FD8059', '#FFF159', '#69FF70', '#A162FF', '#626562',
+                  '#07FFDA', '#30A3FF', '#FF5AFF', '#FF94E3', '#FF2E99',
+                  '#FFBB9D', '#FFFAA2', '#8BFF8A', '#CD83FF', '#777777',
+                  '#019980', '#08529B', '#801CF5', '#BB3280', '#BD0B35',
+                  '#C35035', '#D4C931', '#42A542', '#693DBB', '#393939']
 
-        behavior_colors = {behavior: color for behavior, color in zip(
-            behaviors, ['#02F2C2', '#0D85FD', '#C221FD', '#FF4CD2', '#FB0E59', 
-                        '#FD8059', '#FFF159', '#69FF70', '#A162FF', '#626562'])}
+        behavior_colors = {behavior: colors[i%30] for i, behavior in enumerate(behaviors)}
         try:
             time_key = 'time' + (channels[0][3:] if channels[0].startswith('data') else channels[0][9:])
             time = self.fpho_data_df[time_key]
