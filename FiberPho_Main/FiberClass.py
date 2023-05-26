@@ -1638,9 +1638,10 @@ def alt_to_boris(beh_file, time_unit, beh_false, time_between_bouts):
     behaviors.remove('Time')
     for beh in behaviors:
         trimmed = beh_file[beh_file[beh] != beh_false]
+        trimmed.reset_index(inplace=True, drop=True)
         starts = [(trimmed.iloc[0]['Time'] - beh_file.iloc[0]['Time']) * conversion_to_sec]
         stops = []
-        diffs = np.diff(trimmed.index)
+        diffs = np.diff(trimmed['Time'])
 
         for i, v in enumerate(diffs):
             if v > (time_between_bouts / conversion_to_sec):
