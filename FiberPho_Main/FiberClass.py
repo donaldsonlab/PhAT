@@ -1084,7 +1084,8 @@ class FiberObj:
             )
 
         # Initialize array of time series sums
-        PETS_data = pd.DataFrame()
+        PETS_dict = {}
+        PETS_time_dict = {}
         # Initialize events counter to 0
         n_events = 0
 
@@ -1162,6 +1163,8 @@ class FiberObj:
                 # Tempy stores channel values for this event trace
                 trace = self.fpho_data_df.loc[
                     start_idx : end_idx, channel].values.tolist()
+                time_trace = full_time.iloc[start_idx:end_idx].subtract(
+                    full_time.iloc[start_idx] + time_before).tolist()
                 if percent_bool:
                     if base_option == 'Each event':
                         base_mean = np.nanmean(trace)
@@ -1170,9 +1173,12 @@ class FiberObj:
                 else:
                     this_time_series = self.zscore(trace, base_mean, base_std)
                     norm_type = 'Z-score'
-                # Adds each trace to a dict
-                PETS_data['event' + str(n_events)] = this_time_series
 
+                # Aligns time series and adds each trace to a dict
+                if n_events > 1:
+                    PETS_dict['event' + str(n_events)] = this_time_series
+                    PETS_time_dict['event' + str(n_events)] = time_trace
+                #plot requested traces
                 if show_first == 0:
                     show_first = 1
                 if show_last == -1:
@@ -1191,7 +1197,7 @@ class FiberObj:
                         # Scatter plot
                         go.Scatter(
                         # Times starting at user input start time, ending at user input end time
-                        x = time_clip - time,
+                        x = time_trace,
                         y = this_time_series,
                         mode = "lines",
                         line = dict(color = trace_color, width = 2),
@@ -1200,11 +1206,17 @@ class FiberObj:
                         showlegend=True),
                         row = 1, col = 2
                         )
+        #drop values that aren't in all traces and add to a DataFrame
+        PETS_data = pd.DataFrame()
+        min_length, min_key = min((len(lists), key) for key, lists in PETS_dict.items())
+        for key in PETS_dict:
+            target_times = PETS_time_dict[min_key]
+            closest_times = [min(PETS_time_dict[key], key=lambda x: abs(x - time)) for time in target_times]
+            PETS_data[key] = [PETS_dict[key][PETS_time_dict[key].index(time)] for time in closest_times]
 
         average = PETS_data.mean(axis=1).to_list()
         sem = PETS_data.sem(axis=1).to_list()
-        graph_time = np.linspace(-time_before, time_after,
-                                 num = len(average)).tolist()
+        graph_time = target_times
         PETS_data.insert(0, 'time', graph_time)
         PETS_data.insert(1, 'Average', average)
         PETS_data.insert(2, 'SEM', sem)
