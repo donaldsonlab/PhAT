@@ -234,8 +234,27 @@ class FiberObj:
         for ls in data_dict:
             data_dict[ls] = data_dict[ls][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
+
+        #set negative fiberpho values to 0
+        num_negs = self.fpho_data_df[list(self.channels)].lt(0).sum().sum()
+        if num_negs != 0:
+            self.fpho_data_df[self.fpho_data_df[list(self.channels)]< 0] = 0
+            print(str(num_negs) + ' negative photometry values in ' +
+                  self.obj_name + ' were replaced with 0s.')
+
+        #create an average time column
         time_cols = [col for col in self.fpho_data_df.columns if 'time' in col]
         self.fpho_data_df.insert(0, 'time', self.fpho_data_df[time_cols].mean(axis = 1))
+
+        #remove rows with nans and infs
+        og_len = len(self.fpho_data_df)
+        self.fpho_data_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        self.fpho_data_df = self.fpho_data_df.dropna()
+        final_len = len(self.fpho_data_df)
+        if og_len != final_len:
+            print(str(og_len - final_len) +
+                  ' rows were dropped due to NANs and/or infs when creating ' +
+                  self.obj_name)
 
     def csv__init__(self, time_slice):
         """
@@ -280,6 +299,23 @@ class FiberObj:
         for channel in data_dict:
             data_dict[channel] = data_dict[channel][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
+
+        #remove rows with nans and infs
+        og_len = len(self.fpho_data_df)
+        self.fpho_data_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        self.fpho_data_df = self.fpho_data_df.dropna()
+        final_len = len(self.fpho_data_df)
+        if og_len != final_len:
+            print(str(og_len - final_len) +
+                  ' rows were dropped due to NANs and/or infs when creating ' +
+                  self.obj_name)
+
+        #set negative fiberpho values to 0
+        num_negs = self.fpho_data_df[list(self.channels)].lt(0).sum().sum()
+        if num_negs != 0:
+            self.fpho_data_df[self.fpho_data_df[list(self.channels)]< 0] = 0
+            print(str(num_negs) + ' negative photometry values in ' +
+                  self.obj_name + ' were replaced with 0s.')
 
 #### Helper Functions ####
     def fit_exp(self, time, a, b, c, d, e):
