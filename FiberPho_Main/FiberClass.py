@@ -666,9 +666,15 @@ class FiberObj:
 
         else:
             normed_to_ref = normed_sig
+        if 'Raw' in signal:
+            norm_name = 'Normalized_' + signal[4:]
+        elif 'Normalized_' in signal:
+            norm_name = 'Normalizedx2' + signal[10:]
+        else:
+            norm_name = signal[:11] + str(int(signal[11])+1) + signal[12:]
+        self.fpho_data_df.loc[:, norm_name] = normed_to_ref
+        self.channels.add(norm_name)
 
-        self.fpho_data_df.loc[:,'Normalized_' + signal[4:]] = normed_to_ref
-        self.channels.add('Normalized_' + signal[4:])
         if reference is not None:
             fig = make_subplots(rows = 3, cols = 2, x_title = 'Time(s)',
                                 y_title = 'Flourescence (au)',
@@ -773,7 +779,7 @@ class FiberObj:
             fig.add_trace(
                 go.Scatter(
                 x = sig_time,
-                y = self.fpho_data_df['Normalized_' + signal[4:]],
+                y = self.fpho_data_df[norm_name],
                 mode="lines",
                 line = dict(color = "Hot Pink"),
                 name = 'Final Normalized Signal',
