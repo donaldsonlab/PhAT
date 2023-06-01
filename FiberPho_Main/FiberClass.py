@@ -611,10 +611,10 @@ class FiberObj:
                     motion_artifacts = trained_variables['m'].transpose()[0]+1
                     subplot_3_1_title = 'Normalized signal and detected motion artifacts'
                 except NameError:
-                    print('To use the tmac normalization option you must clone and install 
-                    tmac into the FiberPho_main folder using the directions at 
-                    https://github.com/Nondairy-Creamer/tmac. Please make sure you are 
-                    installing this package in the enviorment you use to run PhAT.')
+                    print('To use the tmac normalization option you must clone and install', 
+                    'tmac into the FiberPho_main folder using the directions at',
+                    'https://github.com/Nondairy-Creamer/tmac. Please make sure you are',
+                    'installing this package in the enviorment you use to run PhAT.')
                     return
             else:
                 if linfit_type == 'Least squares':
