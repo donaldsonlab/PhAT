@@ -6,6 +6,11 @@ import panel as pn
 import scipy.stats as ss
 import scipy.integrate as integrate
 import plotly.graph_objects as go
+try:
+    import tmac.models as tm
+except ImportError:
+    print('The tmac module has not been installed')
+    pass
 from scipy.optimize import curve_fit
 from plotly.subplots import make_subplots
 
@@ -552,7 +557,6 @@ class FiberObj:
         sig_r_square = np.corrcoef(sig, fit_sig)[0,1] ** 2
 
         if sig_r_square < biexp_thres:
-
             a_sig= 0
             b_sig= 0
             c_sig = 0
@@ -595,38 +599,45 @@ class FiberObj:
                 fit_ref = self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
 
             normed_ref = [(k / j) for k,j in zip(ref, fit_ref)]
-
-            if linfit_type == 'Least squares':
-                popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
-                                       bounds = ([0, -1], [100, 1]))
-                a_lin = popt[0]
-                b_lin = popt[1]
-
-            else:
-                sig_q75, sig_q25 = np.percentile(normed_sig, [75 ,25])
-                sig_iqr = sig_q75 - sig_q25
-                ref_q75, ref_q25 = np.percentile(normed_ref, [75 ,25])
-                ref_iqr = ref_q75 - ref_q25
-
-                a_lin = sig_iqr/ref_iqr
-                b_lin = np.median(normed_sig) - a_lin * np.median(normed_ref)
-
-            adjusted_ref=[a_lin * j + b_lin for j in normed_ref]
-            normed_to_ref=[(k / j) for k,j in zip(normed_sig, adjusted_ref)]
-
-            lin_r = np.corrcoef(adjusted_ref, normed_sig)[0,1]
-
-            # below saves all the variables we generated to the df
-            #  data frame inside the obj ex. self
-            # and assign all the long stuff to that
-            # assign the a_sig, b_sig,.. etc and a_ref, b_ref, etc to lists called
-            #self.sig_fit_coefficients, self.ref_fit_coefficients and self.sig_to_ref_coefficients
             self.fpho_data_df.loc[:, reference + ' expfit']=fit_ref
             self.ref_fit_coefficients = ['A= ' + str(a_ref), 'B= ' + str(b_ref), 'C= ' +
                                          str(c_ref), 'D= ' + str(d_ref), 'E= ' + str(e_ref)]
             self.fpho_data_df.loc[:, reference + ' normed to exp']=normed_ref
-            self.fpho_data_df.loc[:,reference + ' fitted to ' + signal]=adjusted_ref
-            self.sig_to_ref_coefficients = ['A= ' + str(a_lin), 'B= ' + str(b_lin)]
+
+            if linfit_type == 'tmac':
+                try:
+                    trained_variables = tm.tmac_ac(np.array(normed_ref), np.array(normed_sig))
+                    normed_to_ref = trained_variables['a'].transpose()[0]
+                    motion_artifacts = trained_variables['m'].transpose()[0]+1
+                    subplot_3_1_title = 'Normalized signal and detected motion artifacts'
+                except NameError:
+                    print('To use the tmac normalization option you must clone and install 
+                    tmac into the FiberPho_main folder using the directions at 
+                    https://github.com/Nondairy-Creamer/tmac. Please make sure you are 
+                    installing this package in the enviorment you use to run PhAT.')
+                    return
+            else:
+                if linfit_type == 'Least squares':
+                    popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
+                                           bounds = ([0, -1], [100, 1]))
+                    a_lin = popt[0]
+                    b_lin = popt[1]
+
+                else:
+                    sig_q75, sig_q25 = np.percentile(normed_sig, [75 ,25])
+                    sig_iqr = sig_q75 - sig_q25
+                    ref_q75, ref_q25 = np.percentile(normed_ref, [75 ,25])
+                    ref_iqr = ref_q75 - ref_q25
+
+                    a_lin = sig_iqr/ref_iqr
+                    b_lin = np.median(normed_sig) - a_lin * np.median(normed_ref)
+                self.sig_to_ref_coefficients = ['A= ' + str(a_lin), 'B= ' + str(b_lin)]
+                adjusted_ref=[a_lin * j + b_lin for j in normed_ref]
+                self.fpho_data_df.loc[:,reference + ' fitted to ' + signal]=adjusted_ref
+                normed_to_ref=[(k / j) for k,j in zip(normed_sig, adjusted_ref)]
+                lin_r = np.corrcoef(adjusted_ref, normed_sig)[0,1]
+                subplot_3_1_title = ("Reference Linearly Fitted to Signal(R = " +  
+                                     str(np.round(lin_r, 3)) + ")")
 
         else:
             normed_to_ref = normed_sig
@@ -642,8 +653,7 @@ class FiberObj:
                                                 "Biexponential Fitted to Ref (R^2 = " +
                                                 str(np.round(ref_r_square, 3)) + ")",
                                                 "Reference Normalized to Biexponential",
-                                                "Reference Linearly Fitted to Signal(R = " +
-                                                str(np.round(lin_r, 3)) + ")",
+                                                subplot_3_1_title,
                                                 "Final Normalized Signal"),
                                 shared_xaxes = True, vertical_spacing = 0.1)
             fig.add_trace(
@@ -712,17 +722,30 @@ class FiberObj:
                 showlegend = False),
                 row = 2, col = 2
                 )
-            fig.add_trace(
-                go.Scatter(
-                x = ref_time,
-                y = self.fpho_data_df[reference + ' fitted to ' + signal],
-                mode = "lines",
-                line = dict(color="Cyan"),
-                name = 'Reference linearly scaled to signal',
-                text = 'Reference linearly scaled to signal',
-                showlegend = False),
-                row = 3, col = 1
-                )
+            if linfit_type == 'tmac':
+                fig.add_trace(
+                    go.Scatter(
+                    x = sig_time,
+                    y = motion_artifacts,
+                    mode = "lines",
+                    line = dict(color="Red"),
+                    name = 'Motion artifacts',
+                    text = 'Motion artifacts',
+                    showlegend = False),
+                    row = 3, col = 1
+                    )
+            else:
+                fig.add_trace(
+                    go.Scatter(
+                    x = ref_time,
+                    y = self.fpho_data_df[reference + ' fitted to ' + signal],
+                    mode = "lines",
+                    line = dict(color="Cyan"),
+                    name = 'Reference linearly scaled to signal',
+                    text = 'Reference linearly scaled to signal',
+                    showlegend = False),
+                    row = 3, col = 1
+                    )
             fig.add_trace(
                 go.Scatter(
                 x = sig_time,
