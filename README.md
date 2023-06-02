@@ -25,7 +25,7 @@ https://pip.pypa.io/en/stable/installation/
 **Create Virtual Environment**
 Using Anaconda (Option 1: Recommended)
 1. Open a new terminal window (Mac/Unix) or Anaconda Prompt (not Anaconda 	Navigator) (Windows).
-2. Navigate to the location of the “PhAT” folder (noted from Step 3) using the command: \
+2. Navigate to the location of the “PhAT” folder (noted in Step 3) using the command: \
 &ensp; “cd [path_to_PhAT_folder]” \
 &ensp; Ex: cd Desktop/DonaldsonLab/PhAT 
 3. Create a virtual environment: \
@@ -54,8 +54,8 @@ Using Anaconda (Option 1: Recommended)
 
 **Using PIP/PyPI (Option 2)**
 1. Open a new terminal window (command prompt for Windows)
-2. Navigate to the location of the “PhAT” folder (noted from Step 1C3) \
-&ensp;    a. Type the following command, instead typing your folder path within the brackets: “cd [path_to_PhAT_folder]” \
+2. Navigate to the location of the “PhAT” folder (noted in Step 3) following command: \
+&ensp;    “cd [path_to_PhAT_folder]” \
 &ensp;  Ex: cd Desktop/DonaldsonLab/PhAT
 3. Create a virtual environment and give it a name (e.g. “my_gui_env”) using one of the following commands. \
 &ensp;    i. Mac/Unix: “python3 -m venv [your_env_name]” \
@@ -64,7 +64,7 @@ Using Anaconda (Option 1: Recommended)
 &ensp;    i. Mac/Unix: “source [your_env_name]/bin/activate” \
 &ensp;    ii. Windows: “.\[your_env_name]\Scripts\activate” 
 5. Execute the following commands to install dependencies. \
-&ensp;     a. Type “pip install -r requirements.txt”
+&ensp;     “pip install -r requirements.txt”
 6. Optional* Add the tmac package (https://github.com/Nondairy-Creamer/tmac) for motion correction with the following commands: \
 &ensp; "cd Fiberpho_main" \
 &ensp; "git clone https://github.com/Nondairy-Creamer/tmac" \
