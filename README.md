@@ -37,7 +37,7 @@ Using Anaconda (Option 1: Recommended)
 5. Update conda  with the following command: \
 &ensp; "conda update -n base -c defaults conda" 
 7. Install jupyter lab or jupyter notebook using the following commands:  \
-&ensp; "conda install -c conda-forge jupyter lab" and/or "conda install -c conda-forge notebook"
+&ensp; "conda install -c conda-forge jupyterlab" and/or "conda install -c conda-forge notebook"
 8. Execute the following command to install dependencies: \
 &ensp; “pip install -r requirements.txt” 
 9. Optional* Add the tmac package (https://github.com/Nondairy-Creamer/tmac) for motion correction: \
