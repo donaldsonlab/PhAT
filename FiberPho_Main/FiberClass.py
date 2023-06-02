@@ -513,12 +513,9 @@ class FiberObj:
                             y_title = "Fluorescence (au)")
         for channel in self.channels:
             try:
-                time = self.fpho_data_df['time' + channel[3:]]
+                time = self.fpho_data_df['time' + channel.split('_')[1]]
             except KeyError:
-                try:
-                    time = self.fpho_data_df['time' + channel[9:]]
-                except KeyError:
-                    time = self.fpho_data_df['time']
+                time = self.fpho_data_df['time']
             fig.add_trace(
                 go.Scatter(
                     x = time,
@@ -569,7 +566,7 @@ class FiberObj:
         # first and third inputs for p0) must be positive
 
         try:
-            sig_time = self.fpho_data_df['time' + signal[3:]]
+            sig_time = self.fpho_data_df['time' + signal.split('_')[1]]
         except KeyError:
             sig_time = self.fpho_data_df['time']
 
@@ -604,7 +601,7 @@ class FiberObj:
 
         if reference is not None:
             try:
-                ref_time = self.fpho_data_df['time' + reference[3:]]
+                ref_time = self.fpho_data_df['time' + reference.split('_')[1]]
             except KeyError:
                 ref_time = self.fpho_data_df['time']
             ref = self.fpho_data_df[reference]
@@ -923,12 +920,9 @@ class FiberObj:
 
         for i, channel in enumerate(channels):
             try:
-                time = self.fpho_data_df['time' + channel[3:]]
+                time = self.fpho_data_df['time' + channel.split('_')[1]]
             except KeyError:
-                try:
-                    time = self.fpho_data_df['time' + channel[9:]]
-                except KeyError:
-                    time = self.fpho_data_df['time']
+                time = self.fpho_data_df['time']
             fig.add_trace(
                 go.Scatter(
                 x = time,
@@ -1021,15 +1015,11 @@ class FiberObj:
             PETS plot for select behaviors
         """
         try:
-            full_time = self.fpho_data_df['time' + channel[3:]]
-            time_name = 'time' + channel[3:]
+            full_time = self.fpho_data_df['time' + channel.split('_')[1]]
+            time_name = 'time' + channel.split('_')[1]
         except KeyError:
-            try:
-                full_time = self.fpho_data_df['time' + channel[9:]]
-                time_name = 'time' + channel[9:]
-            except KeyError:
-                full_time = self.fpho_data_df['time']
-                time_name = 'time'
+            full_time = self.fpho_data_df['time']
+            time_name = 'time'
         # Finds all times where behavior starts, turns into list
         beh_times = list(self.fpho_data_df[(
             self.fpho_data_df[beh]=='S')][time_name])
@@ -1298,19 +1288,13 @@ class FiberObj:
             Plots of both signal against time and the signals against eachother
         """
         try:
-            time1 = self.fpho_data_df['time' + channel1[3:]]
+            time1 = self.fpho_data_df['time' + channel1.split('_')[1]]
         except KeyError:
-            try:
-                time1 = self.fpho_data_df['time' + channel1[9:]]
-            except KeyError:
-                time1 = self.fpho_data_df['time']
+            time1 = self.fpho_data_df['time']
         try:
-            time2 = obj2.fpho_data_df['time' + channel2[3:]]
+            time2 = obj2.fpho_data_df['time' + channel2.split('_')[1]]
         except KeyError:
-            try:
-                time2 = obj2.fpho_data_df['time' + channel2[9:]]
-            except KeyError:
-                time2 = obj2.fpho_data_df['time']
+            time2 = obj2.fpho_data_df['time']
         #find start
         if np.round(self.frame_rate) != np.round(self.frame_rate):
             print('These traces have different frame rates\n')
@@ -1433,12 +1417,9 @@ class FiberObj:
         behavior_slice1 = self.fpho_data_df[self.fpho_data_df[beh] != ' ']
         behavior_slice2 = obj2.fpho_data_df[self.fpho_data_df[beh] != ' ']
         try:
-            time = behavior_slice1['time' + channel1[3:]]
+            time = behavior_slice1['time' + channel1.split('_')[1]]
         except KeyError:
-            try:
-                time = behavior_slice1['time' + channel1[9:]]
-            except KeyError:
-                time = behavior_slice1['time']
+            time = behavior_slice1['time']
         sig1 = behavior_slice1[channel1]
         sig2 = behavior_slice2[channel2]
         fig = make_subplots(rows = 1, cols = 2)
