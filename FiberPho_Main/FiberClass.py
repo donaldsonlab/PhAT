@@ -513,7 +513,7 @@ class FiberObj:
                             y_title = "Fluorescence (au)")
         for channel in self.channels:
             try:
-                time = self.fpho_data_df['time' + channel.split('_')[1]]
+                time = self.fpho_data_df['time_' + channel.split('_')[1]]
             except KeyError:
                 time = self.fpho_data_df['time']
             fig.add_trace(
@@ -566,7 +566,7 @@ class FiberObj:
         # first and third inputs for p0) must be positive
 
         try:
-            sig_time = self.fpho_data_df['time' + signal.split('_')[1]]
+            sig_time = self.fpho_data_df['time_' + signal.split('_')[1]]
         except KeyError:
             sig_time = self.fpho_data_df['time']
 
@@ -601,7 +601,7 @@ class FiberObj:
 
         if reference is not None:
             try:
-                ref_time = self.fpho_data_df['time' + reference.split('_')[1]]
+                ref_time = self.fpho_data_df['time_' + reference.split('_')[1]]
             except KeyError:
                 ref_time = self.fpho_data_df['time']
             ref = self.fpho_data_df[reference]
@@ -920,7 +920,7 @@ class FiberObj:
 
         for i, channel in enumerate(channels):
             try:
-                time = self.fpho_data_df['time' + channel.split('_')[1]]
+                time = self.fpho_data_df['time_' + channel.split('_')[1]]
             except KeyError:
                 time = self.fpho_data_df['time']
             fig.add_trace(
@@ -1015,8 +1015,8 @@ class FiberObj:
             PETS plot for select behaviors
         """
         try:
-            full_time = self.fpho_data_df['time' + channel.split('_')[1]]
-            time_name = 'time' + channel.split('_')[1]
+            full_time = self.fpho_data_df['time_' + channel.split('_')[1]]
+            time_name = 'time_' + channel.split('_')[1]
         except KeyError:
             full_time = self.fpho_data_df['time']
             time_name = 'time'
@@ -1288,11 +1288,11 @@ class FiberObj:
             Plots of both signal against time and the signals against eachother
         """
         try:
-            time1 = self.fpho_data_df['time' + channel1.split('_')[1]]
+            time1 = self.fpho_data_df['time_' + channel1.split('_')[1]]
         except KeyError:
             time1 = self.fpho_data_df['time']
         try:
-            time2 = obj2.fpho_data_df['time' + channel2.split('_')[1]]
+            time2 = obj2.fpho_data_df['time_' + channel2.split('_')[1]]
         except KeyError:
             time2 = obj2.fpho_data_df['time']
         #find start
@@ -1417,7 +1417,7 @@ class FiberObj:
         behavior_slice1 = self.fpho_data_df[self.fpho_data_df[beh] != ' ']
         behavior_slice2 = obj2.fpho_data_df[self.fpho_data_df[beh] != ' ']
         try:
-            time = behavior_slice1['time' + channel1.split('_')[1]]
+            time = behavior_slice1['time_' + channel1.split('_')[1]]
         except KeyError:
             time = behavior_slice1['time']
         sig1 = behavior_slice1[channel1]
