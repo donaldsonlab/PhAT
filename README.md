@@ -25,34 +25,49 @@ https://pip.pypa.io/en/stable/installation/
 **Create Virtual Environment**
 Using Anaconda (Option 1: Recommended)
 1. Open a new terminal window (Mac/Unix) or Anaconda Prompt (not Anaconda 	Navigator) (Windows).
-2. Navigate to the location of the “PhAT” folder (noted from Step 3). \
-&ensp;    a.Type the following command, instead typing your folder path within the brackets: “cd [path_to_PhAT_folder]”. Then hit enter.\
-&ensp;&ensp;&ensp; Ex. cd Desktop/DonaldsonLab/PhAT 
-3. Create a virtual environment and give it a name (e.g. “my_gui_env”) with the following command: “conda create -n [your_env_name] python=[version] pip”. Then hit enter. \
+2. Navigate to the location of the “PhAT” folder (noted in Step 3) using the command: \
+&ensp; “cd [path_to_PhAT_folder]” \
+&ensp; Ex: cd Desktop/DonaldsonLab/PhAT 
+3. Create a virtual environment: \
+&ensp; “conda create -n [your_env_name] python=[version] pip” \
 &ensp;    Ex: conda create -n my_gui_env python=3.9 pip 
-4. Activate the virtual environment with the following command: “conda activate [your_env_name]” Then hit enter. \
-&ensp;        Ex: conda activate my_gui_env
-5. Execute the following commands to install dependencies. \
-&ensp;    a. Type “pip list”. Then hit enter. \
-&ensp;&ensp;&ensp; No dependencies should be present since this is a new environment. \
-&ensp;    b. Type “pip install -r requirements.txt”. Then hit enter. \
-&ensp;    c. Type “pip list”. Then hit enter. \
-&ensp;&ensp;&ensp; All necessary dependencies should now be installed.
+4. Activate the virtual environment with the following command: \
+&ensp;  “conda activate [your_env_name]” \
+&ensp;   Ex: conda activate my_gui_env
+5. Update conda  with the following command: \
+&ensp; "conda update -n base -c defaults conda" 
+7. Install jupyter lab or jupyter notebook using the following commands:  \
+&ensp; "conda install -c conda-forge jupyter lab" and/or "conda install -c conda-forge notebook"
+8. Execute the following command to install dependencies: \
+&ensp; “pip install -r requirements.txt” 
+9. Optional* Add the tmac package (https://github.com/Nondairy-Creamer/tmac) for motion correction: \
+&ensp; "cd Fiberpho_main" \
+&ensp; "git clone https://github.com/Nondairy-Creamer/tmac" \
+&ensp; "cd tmac" \
+&ensp; "pip install -e ." \
+&ensp; cd ..&#92;..
+9. Launch jupyter lab or notebook from the terminal by typing one of the following commands: \
+&ensp; "jupyter lab" \
+&ensp; "jupyter notebook" \
+&ensp; Note: If you choose to launch these applications of Anaconda Navigator be sure to change the environment on the Anaconda Navigator from base(root) to your new environment. 
+
 
 **Using PIP/PyPI (Option 2)**
 1. Open a new terminal window (command prompt for Windows)
-2. Navigate to the location of the “PhAT” folder (noted from Step 1C3). \
-&ensp;    a. Type the following command, instead typing your folder path within the brackets: “cd [path_to_PhAT_folder]”. Then hit enter. \
-&ensp;&ensp;&ensp;  Ex: cd Desktop/DonaldsonLab/PhAT
+2. Navigate to the location of the “PhAT” folder (noted in Step 3) following command: \
+&ensp;    “cd [path_to_PhAT_folder]” \
+&ensp;  Ex: cd Desktop/DonaldsonLab/PhAT
 3. Create a virtual environment and give it a name (e.g. “my_gui_env”) using one of the following commands. \
-&ensp;    i. Mac/Unix: “python3 -m venv [your_env_name]”. Then hit enter. \
-&ensp;    ii. Windows: “py -m venv [your_env_name]”. Then hit enter.
+&ensp;    i. Mac/Unix: “python3 -m venv [your_env_name]” \
+&ensp;    ii. Windows: “py -m venv [your_env_name]”
 4. Activate the virtual environment. \
-&ensp;    i. Mac/Unix: “source [your_env_name]/bin/activate”. Then hit enter. \
-&ensp;    ii. Windows: “.\[your_env_name]\Scripts\activate”. Then hit enter. 
+&ensp;    i. Mac/Unix: “source [your_env_name]/bin/activate” \
+&ensp;    ii. Windows: “.\[your_env_name]\Scripts\activate” 
 5. Execute the following commands to install dependencies. \
-&ensp;    a. Type “pip list”. Then hit enter. \
-&ensp;&ensp;&ensp; No dependencies should be present since this is a new environment.  \
-&ensp;    b. Type “pip install -r requirements.txt”. Then hit enter. \
-&ensp;    c. Type “pip list”. Then hit enter. \
-&ensp;&ensp;&ensp; All necessary dependencies should now be installed.
+&ensp;     “pip install -r requirements.txt”
+6. Optional* Add the tmac package (https://github.com/Nondairy-Creamer/tmac) for motion correction with the following commands: \
+&ensp; "cd Fiberpho_main" \
+&ensp; "git clone https://github.com/Nondairy-Creamer/tmac" \
+&ensp; "cd tmac" \
+&ensp; "pip install -e ." \
+&ensp; cd ..&#92;..
