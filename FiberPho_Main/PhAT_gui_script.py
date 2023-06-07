@@ -1187,10 +1187,9 @@ alt_beh_input = pn.widgets.FileInput(name = 'Upload Behavior Data',
 
 #Buttons
 upload_beh_btn = pn.widgets.Button(name = 'Import Behavior Data', button_type = 'primary',
-                                   width = 200, align = 'start')
+                                   align = 'start')
 upload_beh_btn.on_click(run_import_behavior_data) #Button action
-upload_alt_beh_btn = pn.widgets.Button(name = 'Upload', button_type = 'primary',
-                                       width = 100)
+upload_alt_beh_btn = pn.widgets.Button(name = 'Upload', button_type = 'primary')
 upload_alt_beh_btn.on_click(run_convert_alt_beh)
 upload_beh_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and reads 
                                     dataframe to update and include subject, behavior,
@@ -1199,13 +1198,14 @@ convert_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and re
                                     dataframe to update and include subject, behavior,
                                     and status columns to the dataframe.""" )
 time_unit = pn.widgets.Select(name = 'Time unit', value = 'milliseconds',
-                              options = ['milliseconds', 'seconds', 'minutes'])
+                              options = ['milliseconds', 'seconds', 'minutes'],
+                              width = 100, sizing_mode = 'fixed')
 
 beh_false = pn.widgets.TextInput(name = 'value where behavior is not occuring',
-                                 value = '0')
+                                 value = '0', width = 200, sizing_mode = 'fixed')
 
 time_between_bouts = pn.widgets.FloatInput(name = 'minimum time between bouts (s)',
-                                          value = 0.5)
+                                          value = 0.5, width = 70, sizing_mode = 'fixed')
 
 #Box
 behav_options = pn.Column(behav_input, upload_beh_btn)
@@ -1215,7 +1215,7 @@ alt_beh_options = pn.Column(alt_beh_input,
 beh_tabs = pn.Tabs(('BORIS format', behav_options),
                    ('Alternative format', alt_beh_options))
 
-upload_beh_widget = pn.WidgetBox(behav_selecta, beh_tabs, height = 220)
+upload_beh_widget = pn.WidgetBox(behav_selecta, beh_tabs, height = 230)
 upload_beh_card = pn.Card(upload_beh_widget, title = 'Import Behavior',
                           background = 'WhiteSmoke', collapsed = False)
 
@@ -1482,7 +1482,7 @@ download_results_card = pn.Card(download_results_widget,
 #Object info widget
 
 #Table
-info_table = pn.widgets.Tabulator(fiber_data, height = 220, page_size = 10, disabled = True)
+info_table = pn.widgets.Tabulator(fiber_data, height = 230, page_size = 10, disabled = True)
 
 obj_info_card = pn.Card(info_table, title = "Display Object Attributes", 
                         background = 'WhiteSmoke', collapsed = False)
