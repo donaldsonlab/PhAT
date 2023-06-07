@@ -21,8 +21,8 @@ import FiberClass as fc
 
 
 '''
-Command to run script:
-    panel serve --show PhAT_gui_script.py --websocket-max-message-size=104876000 --autoreload --port 5006
+Execute the following command in your terminal to start the GUI:
+    bash gui_script.sh
 '''
 
 #current obj version
@@ -189,18 +189,22 @@ def run_upload_fiberobj(event):
     ----------
     None
     """
-    upload = upload_pkl_selecta.filename
-    for filename in upload:
-        with io.open (filename, 'rb') as file:
-            try:
-                temp_obj = pickle.load(file)
-            except EOFError:                    
-                pn.state.notifications.error(
-                    'Error: Please check logger for more info',
-                    duration = 4000)
-                print("Error uploading " + filename +
-                      ". Ensure this is a valid .pkl file")
-                continue
+    filenames = upload_pkl_selecta.filename
+    for filename in filenames:
+        try:
+            temp_obj = pd.read_pickle(filename)
+        except FileNotFoundError:                    
+            pn.state.notifications.error(
+                'Error: Please check logger for more info',
+                duration = 4000)
+            print(filename + ' could not be uploaded.' + 
+                  ' You can only upload pickles located in the FiberPho_Main folder.')
+            continue
+        except EOFError:                    
+            pn.state.notifications.error(
+                'Error: Please check logger for more info', duration = 4000)
+            print("Error uploading " + filename + ". Ensure this is a valid .pkl file")
+            continue
         fiber_objs[temp_obj.obj_name] = temp_obj
         if not hasattr(temp_obj, 'version') or temp_obj.version != current_version:
             pn.state.notifications.error(
@@ -367,8 +371,7 @@ def run_plot_traces(event):
     for objs in selected_objs:
         temp = fiber_objs[objs]
         #Creates pane for plotting
-        plot_pane = pn.pane.Plotly(height = 300,
-                                   sizing_mode = "stretch_width")
+        plot_pane = pn.pane.Plotly(height = 300)
         #Sets figure to plot variable
         try:
             plot_pane.object = temp.plot_traces() 
@@ -404,8 +407,7 @@ def run_normalize_a_signal(event):
     for objs in selected_objs:
         temp = fiber_objs[objs]
         #Creates pane for plotting
-        plot_pane = pn.pane.Plotly(height = 900,
-                                   sizing_mode = "stretch_width") 
+        plot_pane = pn.pane.Plotly(height = 900) 
         #Sets figure to plot variable
         try:
             plot_pane.object = temp.normalize_a_signal(pick_signal.value, pick_reference.value,
@@ -485,8 +487,7 @@ def run_plot_behavior(event):
         temp = fiber_objs[objs]
         # if temp.beh_file is None: # Bug: Plot behavior still runs even without behavior file
         #Creates pane for plotting
-        plot_pane = pn.pane.Plotly(height = 500,
-                                   sizing_mode = "stretch_width") 
+        plot_pane = pn.pane.Plotly(height = 500) 
         #Sets figure to plot variable
         try:
             plot_pane.object = temp.plot_behavior(behavior_selecta.value,
@@ -527,8 +528,7 @@ def run_plot_PETS(event):
             temp = fiber_objs[objs]
             for channel in zchannel_selecta.value:
                 #Creates pane for plotting
-                plot_pane = pn.pane.Plotly(height = 500,
-                                           sizing_mode = "stretch_width") 
+                plot_pane = pn.pane.Plotly(height = 500) 
                 #Sets figure to plot variable
                 try:
                     plot_pane.object = temp.plot_PETS(channel, beh, 
@@ -578,8 +578,7 @@ def run_pearsons_correlation(event):
         start = pears_start_time.value
         end = pears_end_time.value
         #Creates pane for plot
-        plot_pane = pn.pane.Plotly(height = 300,
-                                   sizing_mode = "stretch_width") 
+        plot_pane = pn.pane.Plotly(height = 300) 
         plot_pane.object = obj1.pearsons_correlation(obj2,
                                                      channel1, channel2,
                                                      start, end)
@@ -619,8 +618,7 @@ def run_beh_specific_pearsons(event):
         channel1 = beh_corr_channel_selecta1.value
         channel2 = beh_corr_channel_selecta2.value
         #Creates pane for plot
-        plot_pane = pn.pane.Plotly(height = 300,
-                                   sizing_mode = "stretch_width")
+        plot_pane = pn.pane.Plotly(height = 300)
         try:
             plot_pane.object = obj1.behavior_specific_pearsons(obj2,
                                                                channel1,
@@ -664,17 +662,30 @@ def run_download_results(event):
                 results = pd.concat([fiber_objs[name].PETS_results
                                     for name in results_selecta.value],
                                     ignore_index=True)
-                results.to_csv(filename + '_PETS_results.csv')
+                results.to_csv(filename + '_PETS_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'PETS Results Saved', duration = 4000)
+                print("PETS results saved at: " + os.path.abspath(""))
             if types == 'Correlation Results':
                 results = pd.concat([fiber_objs[name].correlation_results
                                     for name in results_selecta.value],
                                     ignore_index=True)
-                results.to_csv(filename + '_correlation_results.csv')
+                results.to_csv(filename + '_correlation_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'Correlation Results Saved', duration = 4000)
+                print("Correlation results saved at: " + os.path.abspath(""))
             if types == 'Behavior Specific Correlation Reuslts':
                 results = pd.concat([fiber_objs[name].beh_corr_results
                                     for name in results_selecta.value],
                                     ignore_index=True)
-                results.to_csv(filename + '_behavior_correlation_results.csv')
+                results.to_csv(filename + '_behavior_correlation_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'Behavior Correlation Results Saved', duration = 4000)
+                print("Behavior correlation results saved at: " + os.path.abspath(""))
+        except FileExistsError:
+            pn.state.notifications.error(
+                'Error: Please check logger for more info', duration = 4000)
+            print('A file with this name already exists. Please change the output filename')
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -715,7 +726,7 @@ def run_convert_alt_beh(event):
         try:
             beh_data = fc.alt_to_boris(alt_beh_file, time_unit.value, beh_false.value,
                                        time_between_bouts.value)
-            print(beh_data)
+            # print(beh_data)
             obj.import_behavior_data(beh_data, name)
             fiber_data.loc[obj.obj_name, 'Behavior File'] = obj.beh_filename
             info_table.value = fiber_data
@@ -922,8 +933,7 @@ def update_obj_selectas(existing_objs):
 # Error logger
 terminal = pn.widgets.Terminal(
     options = {"cursorBlink": False},
-    height = 200,
-    sizing_mode = 'stretch_width')
+    height = 200)
 sys.stdout = terminal
 # Logger settings
 logger = logging.getLogger("terminal")
@@ -948,7 +958,7 @@ logger_info = pn.pane.Markdown(""" ##Logger
                             """, height = 40, width = 60)
 
 log_card = pn.Card(pn.Row(logger_info, clear_logs), terminal, title = 'Logs',
-                   background = 'WhiteSmoke', width = 600,
+                   background = 'WhiteSmoke', 
                    collapsed = False, collapsible = False)
 
 # ----------------------------------------------------- #
@@ -964,9 +974,9 @@ input_3 = pn.widgets.TextInput(name = 'Animal Number',
                               width = 80, placeholder = 'String')
 input_4 = pn.widgets.TextInput(name = 'Exp Date', width = 90, placeholder = 'Date')
 input_5 = pn.widgets.TextInput(name = 'Exp Time', width = 90, placeholder = 'Time')
-input_6 = pn.widgets.IntInput(name = 'Exclude time from beginning of recording(s)',
+input_6 = pn.widgets.IntInput(name = 'Exclude time from beginning of recording(sec)',
                                width = 90, placeholder = 'Seconds', value = 0)
-input_7 = pn.widgets.IntInput(name = 'Stop time from the beginning(s)',
+input_7 = pn.widgets.IntInput(name = 'Stop time from the beginning(sec)',
                                width = 90, placeholder = 'Seconds',
                               value = -1) #looking for better name
 fiber_num_row = pn.Row(npm_format, input_2)
@@ -975,12 +985,11 @@ input_col = pn.Column(input_3, input_4, input_5)
 #Buttons
 upload_button = pn.widgets.Button(name = 'Create Object',
                                   button_type = 'primary',
-                                  width = 500, sizing_mode = 'stretch_width',
                                   align = 'end', disabled = True)
 
 read_csv_btn = pn.widgets.Button(name = 'Read CSV',
                                  button_type = 'primary',
-                                 width = 500, sizing_mode = 'stretch_width',
+                                  
                                  align = 'start', loading = False)
 
 read_csv_btn.on_click(run_read_csv) # Button action
@@ -1005,7 +1014,7 @@ upload_pkl_selecta = pn.widgets.FileInput(name = 'Upload Saved Fiber Objects',
 #Buttons
 upload_pkl_btn = pn.widgets.Button(name = 'Upload Object(s)',
                                    button_type = 'primary',
-                                   width = 500, sizing_mode = 'stretch_width',
+                                    
                                    align = 'end')
 upload_pkl_btn.on_click(run_upload_fiberobj) #Button action
 
@@ -1039,7 +1048,7 @@ combine_time = pn.widgets.FloatInput(name = 'x seconds', value = 0,
 #Buttons
 combine_obj_btn = pn.widgets.Button(name = 'Combine Objects',
                                    button_type = 'primary',
-                                   width = 500, sizing_mode = 'stretch_width',
+                                    
                                    align = 'end')
 combine_obj_btn.on_click(run_combine_objs) #Button action
 
@@ -1059,8 +1068,8 @@ delete_obj_selecta = pn.widgets.MultiSelect(name = 'Fiber Objects',
 
 #Buttons
 delete_obj_btn = pn.widgets.Button(name = 'Delete Object(s)',
-                                   button_type = 'danger', width = 500,
-                                   sizing_mode = 'stretch_width',
+                                   button_type = 'danger', 
+                                   
                                    align = 'end')
 delete_obj_btn.on_click(run_delete_fiberobj) #Button action
 
@@ -1079,8 +1088,8 @@ save_obj_selecta = pn.widgets.MultiSelect(name = 'Fiber Objects',
 
 #Buttons
 save_obj_btn = pn.widgets.Button(name = 'Save Object', 
-                                 button_type = 'primary', width = 500,
-                                 sizing_mode = 'stretch_width',
+                                 button_type = 'primary', 
+                                 
                                  align = 'end')
 save_obj_btn.on_click(run_save_fiberobj) #Button action
 
@@ -1099,8 +1108,7 @@ obj_selecta = pn.widgets.MultiSelect(name = 'Fiber Objects', value = [],
 
 #Buttons
 plot_raw_btn = pn.widgets.Button(name = 'Plot Raw Signal',
-                                 button_type = 'primary',
-                                 width = 200, sizing_mode = 'stretch_width',
+                                 button_type = 'primary', 
                                  align = 'start')
 plot_raw_btn.on_click(run_plot_traces)
 clear_raw = pn.widgets.Button(name = 'Clear Plots \u274c',
@@ -1109,7 +1117,7 @@ clear_raw = pn.widgets.Button(name = 'Clear Plots \u274c',
 clear_raw.on_click(clear_plots)
 raw_info = pn.pane.Markdown("""
                                 - Plots the raw signal outputs of fiber objects.
-                            """, width = 200)
+                            """)
 save_pdf_rawplot = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
 
 
@@ -1117,9 +1125,9 @@ save_pdf_rawplot = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
 plot_options = pn.Column(obj_selecta, plot_raw_btn)
 plot_raw_widget = pn.WidgetBox(raw_info, plot_options)
 plot_ops = pn.Row(save_pdf_rawplot, clear_raw,
-                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+                   margin = (0, 100, 0, 0))
 plot_raw_card = pn.Card(plot_raw_widget, plot_ops, title = 'Plot Raw Signal',
-                        background = 'WhiteSmoke', width = 600, collapsed = True)
+                        background = 'WhiteSmoke',  collapsed = True)
 
 # ----------------------------------------------------- # 
 #Normalize signal to reference Widget
@@ -1131,19 +1139,15 @@ pick_signal = pn.widgets.Select(name = 'Signal', value = [], options = [])
 pick_reference = pn.widgets.Select(name = 'Reference', value = [], options = [])
 biexp_thres = pn.widgets.FloatInput(name = 'Biexpoential goodness of fit threshold(R^2)', value = 0.05,
                                        width = 80)
-linfit_type = pn.widgets.Select(name = 'Fit type for motion correction', options = ['Least squares', 'Quartile fit'])
+linfit_type = pn.widgets.Select(name = 'Fit type for motion correction', options = ['Least squares', 'Quartile fit', 'tmac'])
 
 #Buttons
 norm_sig_btn = pn.widgets.Button(name = 'Normalize Signal',
                                  button_type = 'primary',
-                                 width = 200,
-                                 sizing_mode = 'stretch_width',
                                  align = 'start')
 norm_sig_btn.on_click(run_normalize_a_signal)
 update_norm_options_btn = pn.widgets.Button(name = 'Update Options',
                                             button_type = 'primary',
-                                            width = 200,
-                                            sizing_mode = 'stretch_width',
                                             align = 'start')
 update_norm_options_btn.on_click(update_selecta_options)
 clear_norm = pn.widgets.Button(name = 'Clear Plots \u274c',
@@ -1154,22 +1158,20 @@ norm_info = pn.pane.Markdown(""" - Normalizes the signal and reference trace to
                                 a biexponential, linearly fits the normalized
                                 reference to the normalized signal. <br>
                                 Stores all fitted traces in the dataframe 
-                                and plots them for examination.""",
-                             width = 200)
+                                and plots them for examination.""")
 save_pdf_norm = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
 
 #Box
-thres_row = pn.Row(biexp_thres, linfit_type,
-                   sizing_mode = 'stretch_width')
+thres_row = pn.Row(biexp_thres, linfit_type)
 norm_options = pn.Column(norm_selecta, update_norm_options_btn, pick_signal,
                          pick_reference, thres_row, norm_sig_btn)
 norm_sig_widget = pn.WidgetBox('# Normalize Signal', norm_info, norm_options)
 plot_ops = pn.Row(save_pdf_norm , clear_norm,
-                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+                   margin = (0, 100, 0, 0))
 norm_sig_card = pn.Card(norm_sig_widget, plot_ops,
                         title = 'Normalize to a reference',
                         background = 'WhiteSmoke',
-                        width = 600, collapsed = True)
+                         collapsed = True)
 
 
 # ----------------------------------------------------- # 
@@ -1184,30 +1186,26 @@ alt_beh_input = pn.widgets.FileInput(name = 'Upload Behavior Data',
                                   accept = '.csv')
 
 #Buttons
-upload_beh_btn = pn.widgets.Button(name = 'Import Behavior Data',
-                                   button_type = 'primary', width = 200,
-                                   sizing_mode = 'stretch_width',
-                                   align = 'start')
+upload_beh_btn = pn.widgets.Button(name = 'Import Behavior Data', button_type = 'primary',
+                                   width = 200, align = 'start')
 upload_beh_btn.on_click(run_import_behavior_data) #Button action
 upload_alt_beh_btn = pn.widgets.Button(name = 'Upload', button_type = 'primary',
-                                    width = 100, sizing_mode = 'stretch_width')
+                                       width = 100)
 upload_alt_beh_btn.on_click(run_convert_alt_beh)
 upload_beh_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and reads 
                                     dataframe to update and include subject, behavior,
-                                    and status columns to the dataframe.""",
-                                   width = 200)
+                                    and status columns to the dataframe.""")
 convert_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and reads 
                                     dataframe to update and include subject, behavior,
-                                    and status columns to the dataframe.""" ,
-                                width = 200)
+                                    and status columns to the dataframe.""" )
 time_unit = pn.widgets.Select(name = 'Time unit', value = 'milliseconds',
                               options = ['milliseconds', 'seconds', 'minutes'])
 
 beh_false = pn.widgets.TextInput(name = 'value where behavior is not occuring',
-                                 value = '0', width = 80)
+                                 value = '0')
 
-time_between_bouts = pn.widgets.FloatInput(name = 'minimun time between bouts (s)',
-                                          value = 0.5, width = 80)
+time_between_bouts = pn.widgets.FloatInput(name = 'minimum time between bouts (s)',
+                                          value = 0.5)
 
 #Box
 behav_options = pn.Column(behav_input, upload_beh_btn)
@@ -1217,7 +1215,7 @@ alt_beh_options = pn.Column(alt_beh_input,
 beh_tabs = pn.Tabs(('BORIS format', behav_options),
                    ('Alternative format', alt_beh_options))
 
-upload_beh_widget = pn.WidgetBox(behav_selecta, beh_tabs, height = 270)
+upload_beh_widget = pn.WidgetBox(behav_selecta, beh_tabs, height = 220)
 upload_beh_card = pn.Card(upload_beh_widget, title = 'Import Behavior',
                           background = 'WhiteSmoke', collapsed = False)
 
@@ -1236,15 +1234,12 @@ behavior_selecta = pn.widgets.MultiSelect(name = 'Behavior', value = [],
 
 #Buttons
 plot_beh_btn = pn.widgets.Button(name = 'Plot Behavior',
-                                 button_type = 'primary', 
-                                 width = 200, sizing_mode = 'stretch_width',
-                                 align = 'start')
+                                 button_type = 'primary',
+                                 width = 200, align = 'start')
 plot_beh_btn.on_click(run_plot_behavior) #Button action
 
 update_plot_options_btn = pn.widgets.Button(name = 'Update Options',
                                             button_type = 'primary',
-                                            width = 200,
-                                            sizing_mode = 'stretch_width',
                                             align = 'start')
 update_plot_options_btn.on_click(update_selecta_options) #Button action
 clear_beh = pn.widgets.Button(name = 'Clear Plots \u274c',
@@ -1254,7 +1249,7 @@ clear_beh = pn.widgets.Button(name = 'Clear Plots \u274c',
 clear_beh.on_click(clear_plots)
 
 beh_info = pn.pane.Markdown(""" - Creates and displays the different channels 
-                            from behavior data.""", width = 200)
+                            from behavior data.""")
 
 save_pdf_beh = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
 
@@ -1263,10 +1258,10 @@ plot_beh_options = pn.Column(plot_beh_selecta, update_plot_options_btn, channel_
                              behavior_selecta, plot_beh_btn)
 plot_beh_widget = pn.WidgetBox('# Plot Behavior', beh_info, plot_beh_options)
 plot_ops = pn.Row(save_pdf_beh , clear_beh,
-                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+                   margin = (0, 100, 0, 0))
 plot_beh_card = pn.Card(plot_beh_widget, plot_ops, 
                         title = 'Plot Behavior', background = 'WhiteSmoke',
-                        width = 600, collapsed = True)
+                         collapsed = True)
 
 # ----------------------------------------------------- # 
 # ----------------------------------------------------- # 
@@ -1305,22 +1300,18 @@ PETS_note = pn.pane.Markdown(""" ***Note :***<br>
                                 the baseline computation method. <br>
                                 - The parameters are in seconds. <br>
                                 - Please check where you would like your
-                                baseline window""",
-                                width = 200)
+                                baseline window""")
 PETS_info = pn.pane.Markdown(""" - Creates a peri-event time series plot for a 
                             selected behavior with the average and SEM of all
-                            occurances of that behavior.""", 
-                             width = 200)
+                            occurances of that behavior.""")
 
 save_pdf_PETS = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
 
 #Buttons
 PETS_btn = pn.widgets.Button(name = 'Create PETS plot', button_type = 'primary',
-                               width = 200, sizing_mode = 'stretch_width',
                                align = 'start')
 PETS_btn.on_click(run_plot_PETS) #Button action
 options_btn = pn.widgets.Button(name = 'Update Options', button_type = 'primary',
-                                width = 200, sizing_mode = 'stretch_width',
                                 align = 'start')
 options_btn.on_click(update_selecta_options) #Button action
 
@@ -1349,10 +1340,10 @@ tabs = pn.Tabs(('PETS', PETS_options),
 PETS_widget = pn.WidgetBox('# Peri-event time series plot',
                            PETS_info, tabs, PETS_btn, check_boxes)
 plot_ops = pn.Row(save_pdf_PETS , clear_PETS,
-                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+                   margin = (0, 100, 0, 0))
 PETS_card = pn.Card(PETS_widget, plot_ops,
                     title = 'Peri-event time series plot',
-                    background = 'WhiteSmoke', width = 600,
+                    background = 'WhiteSmoke', 
                     collapsed = True)
 
 # ----------------------------------------------------- # 
@@ -1376,13 +1367,11 @@ save_pdf_time_corr = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
 
 #Buttons
 pearsons_btn = pn.widgets.Button(name = 'Calculate Pearson\'s Correlation',
-                                 button_type = 'primary', width = 200,
-                                 sizing_mode = 'stretch_width',
+                                 button_type = 'primary',
                                  align = 'start')
 pearsons_btn.on_click(run_pearsons_correlation) #Button action
 pearson_options_btn = pn.widgets.Button(name = 'Update Options',
-                                        button_type = 'primary', width = 200,
-                                        sizing_mode = 'stretch_width',
+                                        button_type = 'primary',
                                         align = 'start')
 pearson_options_btn.on_click(update_selecta_options) #Button action
 clear_pears = pn.widgets.Button(name = 'Clear Plots \u274c', 
@@ -1393,8 +1382,7 @@ clear_pears.on_click(clear_plots)
 
 pears_info = pn.pane.Markdown(""" - Takes in user chosen objects and 
                               channels then returns the Pearson's 
-                              correlation coefficient and plots the signals.""",
-                              width = 200)
+                              correlation coefficient and plots the signals.""")
 #Box
 pearson_row1  = pn.Row(pearsons_selecta1, pearsons_selecta2)
 pearson_row2  = pn.Row(channel1_selecta, channel2_selecta)
@@ -1403,10 +1391,10 @@ pearson_widget = pn.WidgetBox('# Pearons Correlation Plot', pears_info,
                               pearson_row1, pearson_options_btn, pearson_row2,
                               pearson_row3, pearsons_btn)
 plot_ops = pn.Row(save_pdf_time_corr, clear_pears,
-                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+                   margin = (0, 100, 0, 0))
 pearsons_card = pn.Card(pearson_widget, plot_ops,
                         title = 'Pearsons Correlation Coefficient',
-                        background = 'WhiteSmoke', width = 600,
+                        background = 'WhiteSmoke', 
                         collapsed = True)
 
 
@@ -1428,13 +1416,11 @@ beh_corr_behavior_selecta = pn.widgets.MultiSelect(name = 'Behavior',
 
 #Buttons
 beh_corr_btn = pn.widgets.Button(name = 'Calculate Pearson\'s Correlation',
-                                 button_type = 'primary', width = 200,
-                                 sizing_mode = 'stretch_width',
+                                 button_type = 'primary',
                                  align = 'start')
 beh_corr_btn.on_click(run_beh_specific_pearsons) #Button action
 beh_corr_options_btn = pn.widgets.Button(name = 'Update Options',
-                                         button_type = 'primary', width = 200,
-                                         sizing_mode = 'stretch_width',
+                                         button_type = 'primary',
                                          align = 'start')
 beh_corr_options_btn.on_click(update_selecta_options) #Button action
 clear_beh_corr = pn.widgets.Button(name = 'Clear Plots \u274c',
@@ -1444,9 +1430,8 @@ clear_beh_corr.on_click(clear_plots)
 
 beh_corr_info = pn.pane.Markdown(""" - Takes in user chosen objects, channels and 
                                  behaviors to calculate the behavior specific
-                                 Pearson’s correlation and plot the signals.""",
-                                 width = 200)
-save_pdf_beh_corr = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
+                                 Pearson’s correlation and plot the signals.""")
+save_pdf_beh_corr = pn.widgets.Checkbox(name = 'Save plot as pdf', value = False)
 
 
 #Box
@@ -1457,10 +1442,10 @@ beh_corr_options = pn.Column(obj_row, beh_corr_options_btn, channel_row,
 beh_corr_widget = pn.WidgetBox('# Behavior Specific Correlation Plot',
                                beh_corr_info, beh_corr_options)
 plot_ops = pn.Row(save_pdf_beh_corr, clear_beh_corr,
-                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+                   margin = (0, 100, 0, 0))
 beh_corr_card = pn.Card(beh_corr_widget, plot_ops,
                         title = 'Behavior Specific Pearsons Correlation', 
-                        background = 'WhiteSmoke', width = 600, collapsed = True)
+                        background = 'WhiteSmoke',  collapsed = True)
 
 # ----------------------------------------------------- # 
 # ----------------------------------------------------- # 
@@ -1478,8 +1463,7 @@ result_type_selecta= pn.widgets.MultiSelect(name = 'Result Types', value = [],
 
 #Buttons
 download_results_btn = pn.widgets.Button(name = 'Download',
-                                 button_type = 'primary', width = 200,
-                                 sizing_mode = 'stretch_width',
+                                 button_type = 'primary',
                                  align = 'start')
 
 download_results_btn.on_click(run_download_results) #Button action
@@ -1490,7 +1474,7 @@ download_results_widget = pn.WidgetBox('# Download Results', output_name,
                                        download_results_btn)
 download_results_card = pn.Card(download_results_widget,
                                 title = 'Download Results', 
-                                background = 'WhiteSmoke', width = 600,
+                                background = 'WhiteSmoke', 
                                 collapsed = True)
 
 # ----------------------------------------------------- # 
@@ -1498,8 +1482,7 @@ download_results_card = pn.Card(download_results_widget,
 #Object info widget
 
 #Table
-info_table = pn.widgets.Tabulator(fiber_data, height = 270, 
-                                  page_size = 10, disabled = True)
+info_table = pn.widgets.Tabulator(fiber_data, height = 220, page_size = 10, disabled = True)
 
 obj_info_card = pn.Card(info_table, title = "Display Object Attributes", 
                         background = 'WhiteSmoke', collapsed = False)
