@@ -6,6 +6,7 @@ import panel as pn
 import scipy.stats as ss
 import scipy.integrate as integrate
 import plotly.graph_objects as go
+
 try:
     import tmac.models as tm
 except ImportError:
@@ -1163,7 +1164,7 @@ class FiberObj:
                     show_first = 1
                 if show_last == -1:
                     show_last = len(beh_times)
-                events_to_show = np.arange(show_first, show_last, show_every)
+                events_to_show = np.arange(show_first, show_last + 1, show_every)
                 if n_events in events_to_show:
                     # Times for this event trace
                     time_clip = full_time[start_idx : end_idx]
