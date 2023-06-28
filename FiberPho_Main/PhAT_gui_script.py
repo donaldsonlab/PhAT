@@ -189,18 +189,22 @@ def run_upload_fiberobj(event):
     ----------
     None
     """
-    upload = upload_pkl_selecta.filename
-    for filename in upload:
-        with io.open (filename, 'rb') as file:
-            try:
-                temp_obj = pickle.load(file)
-            except EOFError:                    
-                pn.state.notifications.error(
-                    'Error: Please check logger for more info',
-                    duration = 4000)
-                print("Error uploading " + filename +
-                      ". Ensure this is a valid .pkl file")
-                continue
+    filenames = upload_pkl_selecta.filename
+    for filename in filenames:
+        try:
+            temp_obj = pd.read_pickle(filename)
+        except FileNotFoundError:                    
+            pn.state.notifications.error(
+                'Error: Please check logger for more info',
+                duration = 4000)
+            print(filename + ' could not be uploaded.' + 
+                  ' You can only upload pickles located in the FiberPho_Main folder.')
+            continue
+        except EOFError:                    
+            pn.state.notifications.error(
+                'Error: Please check logger for more info', duration = 4000)
+            print("Error uploading " + filename + ". Ensure this is a valid .pkl file")
+            continue
         fiber_objs[temp_obj.obj_name] = temp_obj
         if not hasattr(temp_obj, 'version') or temp_obj.version != current_version:
             pn.state.notifications.error(
@@ -658,17 +662,30 @@ def run_download_results(event):
                 results = pd.concat([fiber_objs[name].PETS_results
                                     for name in results_selecta.value],
                                     ignore_index=True)
-                results.to_csv(filename + '_PETS_results.csv')
+                results.to_csv(filename + '_PETS_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'PETS Results Saved', duration = 4000)
+                print("PETS results saved at: " + os.path.abspath(""))
             if types == 'Correlation Results':
                 results = pd.concat([fiber_objs[name].correlation_results
                                     for name in results_selecta.value],
                                     ignore_index=True)
-                results.to_csv(filename + '_correlation_results.csv')
+                results.to_csv(filename + '_correlation_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'Correlation Results Saved', duration = 4000)
+                print("Correlation results saved at: " + os.path.abspath(""))
             if types == 'Behavior Specific Correlation Reuslts':
                 results = pd.concat([fiber_objs[name].beh_corr_results
                                     for name in results_selecta.value],
                                     ignore_index=True)
-                results.to_csv(filename + '_behavior_correlation_results.csv')
+                results.to_csv(filename + '_behavior_correlation_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'Behavior Correlation Results Saved', duration = 4000)
+                print("Behavior correlation results saved at: " + os.path.abspath(""))
+        except FileExistsError:
+            pn.state.notifications.error(
+                'Error: Please check logger for more info', duration = 4000)
+            print('A file with this name already exists. Please change the output filename')
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -709,7 +726,7 @@ def run_convert_alt_beh(event):
         try:
             beh_data = fc.alt_to_boris(alt_beh_file, time_unit.value, beh_false.value,
                                        time_between_bouts.value)
-            print(beh_data)
+            # print(beh_data)
             obj.import_behavior_data(beh_data, name)
             fiber_data.loc[obj.obj_name, 'Behavior File'] = obj.beh_filename
             info_table.value = fiber_data
@@ -957,9 +974,9 @@ input_3 = pn.widgets.TextInput(name = 'Animal Number',
                               width = 80, placeholder = 'String')
 input_4 = pn.widgets.TextInput(name = 'Exp Date', width = 90, placeholder = 'Date')
 input_5 = pn.widgets.TextInput(name = 'Exp Time', width = 90, placeholder = 'Time')
-input_6 = pn.widgets.IntInput(name = 'Exclude time from beginning of recording(s)',
+input_6 = pn.widgets.IntInput(name = 'Exclude time from beginning of recording(sec)',
                                width = 90, placeholder = 'Seconds', value = 0)
-input_7 = pn.widgets.IntInput(name = 'Stop time from the beginning(s)',
+input_7 = pn.widgets.IntInput(name = 'Stop time from the beginning(sec)',
                                width = 90, placeholder = 'Seconds',
                               value = -1) #looking for better name
 fiber_num_row = pn.Row(npm_format, input_2)
@@ -1122,7 +1139,7 @@ pick_signal = pn.widgets.Select(name = 'Signal', value = [], options = [])
 pick_reference = pn.widgets.Select(name = 'Reference', value = [], options = [])
 biexp_thres = pn.widgets.FloatInput(name = 'Biexpoential goodness of fit threshold(R^2)', value = 0.05,
                                        width = 80)
-linfit_type = pn.widgets.Select(name = 'Fit type for motion correction', options = ['Least squares', 'Quartile fit'])
+linfit_type = pn.widgets.Select(name = 'Fit type for motion correction', options = ['Least squares', 'Quartile fit', 'tmac'])
 
 #Buttons
 norm_sig_btn = pn.widgets.Button(name = 'Normalize Signal',
@@ -1169,7 +1186,8 @@ alt_beh_input = pn.widgets.FileInput(name = 'Upload Behavior Data',
                                   accept = '.csv')
 
 #Buttons
-upload_beh_btn = pn.widgets.Button(name = 'Import Behavior Data', button_type = 'primary')
+upload_beh_btn = pn.widgets.Button(name = 'Import Behavior Data', button_type = 'primary',
+                                   align = 'start')
 upload_beh_btn.on_click(run_import_behavior_data) #Button action
 upload_alt_beh_btn = pn.widgets.Button(name = 'Upload', button_type = 'primary')
 upload_alt_beh_btn.on_click(run_convert_alt_beh)
@@ -1180,13 +1198,14 @@ convert_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and re
                                     dataframe to update and include subject, behavior,
                                     and status columns to the dataframe.""" )
 time_unit = pn.widgets.Select(name = 'Time unit', value = 'milliseconds',
-                              options = ['milliseconds', 'seconds', 'minutes'])
+                              options = ['milliseconds', 'seconds', 'minutes'],
+                              width = 100, sizing_mode = 'fixed')
 
 beh_false = pn.widgets.TextInput(name = 'value where behavior is not occuring',
-                                 value = '0')
+                                 value = '0', width = 200, sizing_mode = 'fixed')
 
 time_between_bouts = pn.widgets.FloatInput(name = 'minimum time between bouts (s)',
-                                          value = 0.5)
+                                          value = 0.5, width = 70, sizing_mode = 'fixed')
 
 #Box
 behav_options = pn.Column(behav_input, upload_beh_btn)
@@ -1196,7 +1215,7 @@ alt_beh_options = pn.Column(alt_beh_input,
 beh_tabs = pn.Tabs(('BORIS format', behav_options),
                    ('Alternative format', alt_beh_options))
 
-upload_beh_widget = pn.WidgetBox(behav_selecta, beh_tabs)
+upload_beh_widget = pn.WidgetBox(behav_selecta, beh_tabs, height = 230)
 upload_beh_card = pn.Card(upload_beh_widget, title = 'Import Behavior',
                           background = 'WhiteSmoke', collapsed = False)
 
@@ -1216,7 +1235,7 @@ behavior_selecta = pn.widgets.MultiSelect(name = 'Behavior', value = [],
 #Buttons
 plot_beh_btn = pn.widgets.Button(name = 'Plot Behavior',
                                  button_type = 'primary',
-                                 align = 'start')
+                                 width = 200, align = 'start')
 plot_beh_btn.on_click(run_plot_behavior) #Button action
 
 update_plot_options_btn = pn.widgets.Button(name = 'Update Options',
@@ -1463,7 +1482,8 @@ download_results_card = pn.Card(download_results_widget,
 #Object info widget
 
 #Table
-info_table = pn.widgets.Tabulator(fiber_data, height = 220, page_size = 10, disabled = True)
+
+info_table = pn.widgets.Tabulator(fiber_data, height = 230, page_size = 10, disabled = True)
 
 obj_info_card = pn.Card(info_table, title = "Display Object Attributes", 
                         background = 'WhiteSmoke', collapsed = False)

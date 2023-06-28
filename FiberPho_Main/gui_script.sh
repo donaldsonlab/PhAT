@@ -1,4 +1,4 @@
-#!/bin/sh
+#!bin/sh
 
 # Update permissions
 chmod +x "$0"

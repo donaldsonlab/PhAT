@@ -7,6 +7,11 @@ import scipy.stats as ss
 import scipy.signal as sci_sig
 import scipy.integrate as integrate
 import plotly.graph_objects as go
+try:
+    import tmac.models as tm
+except ImportError:
+    print('The tmac module has not been installed')
+    pass
 from scipy.optimize import curve_fit
 from plotly.subplots import make_subplots
 
@@ -248,8 +253,27 @@ class FiberObj:
         for ls in data_dict:
             data_dict[ls] = data_dict[ls][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
+
+        #set negative fiberpho values to 0
+        num_negs = self.fpho_data_df[list(self.channels)].lt(0).sum().sum()
+        if num_negs != 0:
+            self.fpho_data_df[self.fpho_data_df[list(self.channels)]< 0] = 0
+            print(str(num_negs) + ' negative photometry values in ' +
+                  self.obj_name + ' were replaced with 0s.')
+
+        #create an average time column
         time_cols = [col for col in self.fpho_data_df.columns if 'time' in col]
         self.fpho_data_df.insert(0, 'time', self.fpho_data_df[time_cols].mean(axis = 1))
+
+        #remove rows with nans and infs
+        og_len = len(self.fpho_data_df)
+        self.fpho_data_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        self.fpho_data_df = self.fpho_data_df.dropna()
+        final_len = len(self.fpho_data_df)
+        if og_len != final_len:
+            print(str(og_len - final_len) +
+                  ' rows were dropped due to NANs and/or infs when creating ' +
+                  self.obj_name)
 
     def csv__init__(self, time_slice):
         """
@@ -294,6 +318,23 @@ class FiberObj:
         for channel in data_dict:
             data_dict[channel] = data_dict[channel][:shortest_list-1]
         self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
+
+        #remove rows with nans and infs
+        og_len = len(self.fpho_data_df)
+        self.fpho_data_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        self.fpho_data_df = self.fpho_data_df.dropna()
+        final_len = len(self.fpho_data_df)
+        if og_len != final_len:
+            print(str(og_len - final_len) +
+                  ' rows were dropped due to NANs and/or infs when creating ' +
+                  self.obj_name)
+
+        #set negative fiberpho values to 0
+        num_negs = self.fpho_data_df[list(self.channels)].lt(0).sum().sum()
+        if num_negs != 0:
+            self.fpho_data_df[self.fpho_data_df[list(self.channels)]< 0] = 0
+            print(str(num_negs) + ' negative photometry values in ' +
+                  self.obj_name + ' were replaced with 0s.')
 
 #### Helper Functions ####
     def fit_exp(self, time, a, b, c, d, e):
@@ -527,18 +568,15 @@ class FiberObj:
                             y_title = "Fluorescence (au)")
         for channel in self.channels:
             try:
-                time = self.fpho_data_df['time' + channel[3:]]
+                time = self.fpho_data_df['time_' + channel.split('_')[1]]
             except KeyError:
-                try:
-                    time = self.fpho_data_df['time' + channel[9:]]
-                except KeyError:
-                    time = self.fpho_data_df['time']
+                time = self.fpho_data_df['time']
             fig.add_trace(
                 go.Scatter(
                     x = time,
                     y = self.fpho_data_df[channel],
                     mode = "lines",
-                    line = go.scatter.Line(color = self.color_dict[channel]),
+                    line = dict(color = self.color_dict[channel]),
                     name = channel,
                     text = channel,
                     showlegend = True
@@ -583,7 +621,7 @@ class FiberObj:
         # first and third inputs for p0) must be positive
 
         try:
-            sig_time = self.fpho_data_df['time' + signal[3:]]
+            sig_time = self.fpho_data_df['time_' + signal.split('_')[1]]
         except KeyError:
             sig_time = self.fpho_data_df['time']
 
@@ -602,7 +640,6 @@ class FiberObj:
         sig_r_square = np.corrcoef(sig, fit_sig)[0,1] ** 2
 
         if sig_r_square < biexp_thres:
-
             a_sig= 0
             b_sig= 0
             c_sig = 0
@@ -618,7 +655,7 @@ class FiberObj:
 
         if reference is not None:
             try:
-                ref_time = self.fpho_data_df['time' + reference[3:]]
+                ref_time = self.fpho_data_df['time_' + reference.split('_')[1]]
             except KeyError:
                 ref_time = self.fpho_data_df['time']
             ref = self.fpho_data_df[reference]
@@ -645,44 +682,57 @@ class FiberObj:
                 fit_ref = self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
 
             normed_ref = [(k / j) for k,j in zip(ref, fit_ref)]
-
-            if linfit_type == 'Least squares':
-                popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
-                                       bounds = ([0, -1], [100, 1]))
-                a_lin = popt[0]
-                b_lin = popt[1]
-
-            else:
-                sig_q75, sig_q25 = np.percentile(normed_sig, [75 ,25])
-                sig_iqr = sig_q75 - sig_q25
-                ref_q75, ref_q25 = np.percentile(normed_ref, [75 ,25])
-                ref_iqr = ref_q75 - ref_q25
-
-                a_lin = sig_iqr/ref_iqr
-                b_lin = np.median(normed_sig) - a_lin * np.median(normed_ref)
-
-            adjusted_ref=[a_lin * j + b_lin for j in normed_ref]
-            normed_to_ref=[(k / j) for k,j in zip(normed_sig, adjusted_ref)]
-
-            lin_r = np.corrcoef(adjusted_ref, normed_sig)[0,1]
-
-            # below saves all the variables we generated to the df
-            #  data frame inside the obj ex. self
-            # and assign all the long stuff to that
-            # assign the a_sig, b_sig,.. etc and a_ref, b_ref, etc to lists called
-            #self.sig_fit_coefficients, self.ref_fit_coefficients and self.sig_to_ref_coefficients
             self.fpho_data_df.loc[:, reference + ' expfit']=fit_ref
             self.ref_fit_coefficients = ['A= ' + str(a_ref), 'B= ' + str(b_ref), 'C= ' +
                                          str(c_ref), 'D= ' + str(d_ref), 'E= ' + str(e_ref)]
             self.fpho_data_df.loc[:, reference + ' normed to exp']=normed_ref
-            self.fpho_data_df.loc[:,reference + ' fitted to ' + signal]=adjusted_ref
-            self.sig_to_ref_coefficients = ['A= ' + str(a_lin), 'B= ' + str(b_lin)]
+
+            if linfit_type == 'tmac':
+                try:
+                    trained_variables = tm.tmac_ac(np.array(normed_ref), np.array(normed_sig))
+                    normed_to_ref = trained_variables['a'].transpose()[0]
+                    motion_artifacts = trained_variables['m'].transpose()[0]+1
+                    subplot_3_1_title = 'Normalized signal and detected motion artifacts'
+                except NameError:
+                    print('To use the tmac normalization option you must clone and install', 
+                    'tmac into the FiberPho_main folder using the directions at',
+                    'https://github.com/Nondairy-Creamer/tmac. Please make sure you are',
+                    'installing this package in the enviorment you use to run PhAT.')
+                    return
+            else:
+                if linfit_type == 'Least squares':
+                    popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
+                                           bounds = ([0, -1], [100, 1]))
+                    a_lin = popt[0]
+                    b_lin = popt[1]
+
+                else:
+                    sig_q75, sig_q25 = np.percentile(normed_sig, [75 ,25])
+                    sig_iqr = sig_q75 - sig_q25
+                    ref_q75, ref_q25 = np.percentile(normed_ref, [75 ,25])
+                    ref_iqr = ref_q75 - ref_q25
+
+                    a_lin = sig_iqr/ref_iqr
+                    b_lin = np.median(normed_sig) - a_lin * np.median(normed_ref)
+                self.sig_to_ref_coefficients = ['A= ' + str(a_lin), 'B= ' + str(b_lin)]
+                adjusted_ref=[a_lin * j + b_lin for j in normed_ref]
+                self.fpho_data_df.loc[:,reference + ' fitted to ' + signal]=adjusted_ref
+                normed_to_ref=[(k / j) for k,j in zip(normed_sig, adjusted_ref)]
+                lin_r = np.corrcoef(adjusted_ref, normed_sig)[0,1]
+                subplot_3_1_title = ("Reference Linearly Fitted to Signal(R = " +  
+                                     str(np.round(lin_r, 3)) + ")")
 
         else:
             normed_to_ref = normed_sig
+        if 'Raw' in signal:
+            norm_name = 'Normalized_' + signal[4:]
+        elif 'Normalized_' in signal:
+            norm_name = 'Normalizedx2' + signal[10:]
+        else:
+            norm_name = signal[:11] + str(int(signal[11])+1) + signal[12:]
+        self.fpho_data_df.loc[:, norm_name] = normed_to_ref
+        self.channels.add(norm_name)
 
-        self.fpho_data_df.loc[:,'Normalized_' + signal[4:]] = normed_to_ref
-        self.channels.add('Normalized_' + signal[4:])
         if reference is not None:
             fig = make_subplots(rows = 3, cols = 2, x_title = 'Time(s)',
                                 y_title = 'Flourescence (au)',
@@ -692,8 +742,7 @@ class FiberObj:
                                                 "Biexponential Fitted to Ref (R^2 = " +
                                                 str(np.round(ref_r_square, 3)) + ")",
                                                 "Reference Normalized to Biexponential",
-                                                "Reference Linearly Fitted to Signal(R = " +
-                                                str(np.round(lin_r, 3)) + ")",
+                                                subplot_3_1_title,
                                                 "Final Normalized Signal"),
                                 shared_xaxes = True, vertical_spacing = 0.1)
             fig.add_trace(
@@ -701,7 +750,7 @@ class FiberObj:
                 x = sig_time,
                 y = sig,
                 mode = "lines",
-                line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
+                line = dict(color="rgba(0, 255, 0, 1)"),
                 name ='Signal:' + signal,
                 text = 'Signal',
                 showlegend = False),
@@ -712,7 +761,7 @@ class FiberObj:
                 x = sig_time,
                 y = self.fpho_data_df[signal + ' expfit'],
                 mode = "lines",
-                line = go.scatter.Line(color="Purple"),
+                line = dict(color="Purple"),
                 name = 'Biexponential fitted to Signal',
                 text = 'Biexponential fitted to Signal',
                 showlegend = False),
@@ -723,7 +772,7 @@ class FiberObj:
                 x = sig_time,
                 y = self.fpho_data_df[signal + ' normed to exp'],
                 mode = "lines",
-                line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
+                line = dict(color="rgba(0, 255, 0, 1)"),
                 name = 'Signal Normalized to Biexponential',
                 text = 'Signal Normalized to Biexponential',
                 showlegend = False),
@@ -734,7 +783,7 @@ class FiberObj:
                 x = ref_time,
                 y = ref,
                 mode = "lines",
-                line = go.scatter.Line(color="Cyan"),
+                line = dict(color="Cyan"),
                 name = 'Reference:' + reference,
                 text = 'Reference',
                 showlegend = False),
@@ -745,7 +794,7 @@ class FiberObj:
                 x = ref_time,
                 y = self.fpho_data_df[reference + ' expfit'],
                 mode = "lines",
-                line = go.scatter.Line(color="Purple"),
+                line = dict(color="Purple"),
                 name = 'Biexponential fit to Reference',
                 text = 'Biexponential fit to Reference',
                 showlegend = False),
@@ -756,29 +805,42 @@ class FiberObj:
                 x = ref_time,
                 y = self.fpho_data_df[reference + ' normed to exp'],
                 mode = "lines",
-                line = go.scatter.Line(color="Cyan"),
+                line = dict(color="Cyan"),
                 name = 'Reference Normalized to Biexponential',
                 text = 'Reference Normalized to Biexponential',
                 showlegend = False),
                 row = 2, col = 2
                 )
-            fig.add_trace(
-                go.Scatter(
-                x = ref_time,
-                y = self.fpho_data_df[reference + ' fitted to ' + signal],
-                mode = "lines",
-                line = go.scatter.Line(color="Cyan"),
-                name = 'Reference linearly scaled to signal',
-                text = 'Reference linearly scaled to signal',
-                showlegend = False),
-                row = 3, col = 1
-                )
+            if linfit_type == 'tmac':
+                fig.add_trace(
+                    go.Scatter(
+                    x = sig_time,
+                    y = motion_artifacts,
+                    mode = "lines",
+                    line = dict(color="Red"),
+                    name = 'Motion artifacts',
+                    text = 'Motion artifacts',
+                    showlegend = False),
+                    row = 3, col = 1
+                    )
+            else:
+                fig.add_trace(
+                    go.Scatter(
+                    x = ref_time,
+                    y = self.fpho_data_df[reference + ' fitted to ' + signal],
+                    mode = "lines",
+                    line = dict(color="Cyan"),
+                    name = 'Reference linearly scaled to signal',
+                    text = 'Reference linearly scaled to signal',
+                    showlegend = False),
+                    row = 3, col = 1
+                    )
             fig.add_trace(
                 go.Scatter(
                 x = sig_time,
                 y = self.fpho_data_df[signal + ' normed to exp'],
                 mode = "lines",
-                line = go.scatter.Line(color="rgba(0, 255, 0, 0.5)"),
+                line = dict(color="rgba(0, 255, 0, 0.5)"),
                 name = 'Signal Normalized to Biexponential',
                 text = 'Signal Normalized to Biexponential',
                 showlegend = False),
@@ -787,9 +849,9 @@ class FiberObj:
             fig.add_trace(
                 go.Scatter(
                 x = sig_time,
-                y = self.fpho_data_df['Normalized_' + signal[4:]],
+                y = self.fpho_data_df[norm_name],
                 mode="lines",
-                line = go.scatter.Line(color = "Hot Pink"),
+                line = dict(color = "Hot Pink"),
                 name = 'Final Normalized Signal',
                 text = 'Final Normalized Signal',
                 showlegend = False),
@@ -799,7 +861,7 @@ class FiberObj:
             fig = make_subplots(rows = 1, cols = 2,
                                 subplot_titles=(
                                     "Biexponential Fitted to Signal(R^2 = "
-                                    + str(sig_r_square) + ")",
+                                    + str(np.round(sig_r_square, 3)) + ")",
                                     "Signal Normalized to Biexponential"
                                 ),
                                 shared_xaxes = True, vertical_spacing = 0.1,
@@ -810,7 +872,7 @@ class FiberObj:
                 x = sig_time,
                 y = sig,
                 mode = "lines",
-                line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
+                line = dict(color="rgba(0, 255, 0, 1)"),
                 name ='Signal:' + signal,
                 text = 'Signal',
                 showlegend = False),
@@ -821,7 +883,7 @@ class FiberObj:
                 x = sig_time,
                 y = self.fpho_data_df[signal + ' expfit'],
                 mode = "lines",
-                line = go.scatter.Line(color="Purple"),
+                line = dict(color="Purple"),
                 name = 'Biexponential fitted to Signal',
                 text = 'Biexponential fitted to Signal',
                 showlegend = False),
@@ -832,7 +894,7 @@ class FiberObj:
                 x = sig_time,
                 y = self.fpho_data_df[signal + ' normed to exp'],
                 mode = "lines",
-                line = go.scatter.Line(color="rgba(0, 255, 0, 1)"),
+                line = dict(color="rgba(0, 255, 0, 1)"),
                 name = 'Signal Normalized to Biexponential',
                 text = 'Signal Normalized to Biexponential',
                 showlegend = False),
@@ -1052,15 +1114,11 @@ class FiberObj:
             PETS plot for select behaviors
         """
         try:
-            full_time = self.fpho_data_df['time' + channel[3:]]
-            time_name = 'time' + channel[3:]
+            full_time = self.fpho_data_df['time_' + channel.split('_')[1]]
+            time_name = 'time_' + channel.split('_')[1]
         except KeyError:
-            try:
-                full_time = self.fpho_data_df['time' + channel[9:]]
-                time_name = 'time' + channel[9:]
-            except KeyError:
-                full_time = self.fpho_data_df['time']
-                time_name = 'time'
+            full_time = self.fpho_data_df['time']
+            time_name = 'time'
         # Finds all times where behavior starts, turns into list
         beh_times = list(self.fpho_data_df[(
             self.fpho_data_df[beh]=='S')][time_name])
@@ -1081,7 +1139,7 @@ class FiberObj:
             x = full_time,
             y = self.fpho_data_df[channel],
             mode = "lines",
-            line = go.scatter.Line(color="Green"),
+            line = dict(color="Green"),
             name = channel,
             showlegend = False),
             row = 1, col =1
@@ -1411,19 +1469,13 @@ class FiberObj:
             Plots of both signal against time and the signals against eachother
         """
         try:
-            time1 = self.fpho_data_df['time' + channel1[3:]]
+            time1 = self.fpho_data_df['time_' + channel1.split('_')[1]]
         except KeyError:
-            try:
-                time1 = self.fpho_data_df['time' + channel1[9:]]
-            except KeyError:
-                time1 = self.fpho_data_df['time']
+            time1 = self.fpho_data_df['time']
         try:
-            time2 = obj2.fpho_data_df['time' + channel2[3:]]
+            time2 = obj2.fpho_data_df['time_' + channel2.split('_')[1]]
         except KeyError:
-            try:
-                time2 = obj2.fpho_data_df['time' + channel2[9:]]
-            except KeyError:
-                time2 = obj2.fpho_data_df['time']
+            time2 = obj2.fpho_data_df['time']
         #find start
         if np.round(self.frame_rate) != np.round(self.frame_rate):
             print('These traces have different frame rates\n')
@@ -1546,12 +1598,9 @@ class FiberObj:
         behavior_slice1 = self.fpho_data_df[self.fpho_data_df[beh] != ' ']
         behavior_slice2 = obj2.fpho_data_df[self.fpho_data_df[beh] != ' ']
         try:
-            time = behavior_slice1['time' + channel1[3:]]
+            time = behavior_slice1['time_' + channel1.split('_')[1]]
         except KeyError:
-            try:
-                time = behavior_slice1['time' + channel1[9:]]
-            except KeyError:
-                time = behavior_slice1['time']
+            time = behavior_slice1['time']
         sig1 = behavior_slice1[channel1]
         sig2 = behavior_slice2[channel2]
         fig = make_subplots(rows = 1, cols = 2)
@@ -1569,7 +1618,7 @@ class FiberObj:
             x = time,
             y = sig1,
             mode = "lines",
-            line = go.scatter.Line(color = 'rgb(255,100,150)'),
+            line = dict(color = 'rgb(255,100,150)'),
             name = channel1,
             showlegend = False),
             row = 1, col = 1
@@ -1579,7 +1628,7 @@ class FiberObj:
             x = time,
             y = sig2,
             mode = "lines",
-            line = go.scatter.Line(color = 'rgba(100,0,200, .6)'),
+            line = dict(color = 'rgba(100,0,200, .6)'),
             showlegend = False),
             row = 1, col = 1
             )
