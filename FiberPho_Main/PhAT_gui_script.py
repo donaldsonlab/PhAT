@@ -122,20 +122,26 @@ def run_init_fiberobj(event):
             'Error: Please check logger for more info', duration = 4000)
         print('There is already an object with this name')
         return
-    try: df 
+    try: 
+        df
     except NameError:
         pn.state.notifications.error(
         'Error: Please check logger for more info', duration = 4000)
         print('Please load or reload your file with the "Read CSV" button')  
-        return   
+        return
+    except IOError:
+        pn.state.notifications.error(
+            'Error: Please check logger for more info', duration = 4000)
+        print('There was a problem reading the dataframe...try again')
+        return
     try:
         #Add to dict if object name does not already exist
         new_obj = fc.FiberObj(df, input_params[0], input_params[1],
                               input_params[2], input_params[3],
                               input_params[4], input_params[5], 
                               input_params[6], input_params[7])    
-        # Extra precaution to delete dataframe from memory
-        # once it has been uploaded for future obj uploads
+        # Garbage collection
+        # Releases memory for next instance
         del df
     except KeyError:
         logger.error(traceback.format_exc())
@@ -153,6 +159,12 @@ def run_init_fiberobj(event):
         logger.error(traceback.format_exc())
         pn.state.notifications.error(
             'Error: Please check logger for more information', duration = 4000)
+        return
+    except ValueError:
+        logger.error(traceback.format_exc())
+        pn.state.notifications.error(
+            'Error: Please check logger for more information', duration = 4000)
+        print('Dataframe is empty. Please ensure a new csv has been imported')
         return
     #adds new obj to the dict
     fiber_objs[input_params[0]] = new_obj
@@ -268,8 +280,6 @@ def run_combine_objs(event):
         print('key error')
         return
     fiber_objs[new_obj.obj_name] = new_obj
-    pn.state.notifications.success('Created ' + new_obj.obj_name +
-                                   ' object!', duration = 4000)
     #Adds to relevant info to dataframe
     fiber_data.loc[new_obj.obj_name] = ([new_obj.fiber_num, 
                                         new_obj.animal_num,
@@ -281,6 +291,8 @@ def run_combine_objs(event):
     existing_objs = fiber_objs
     #Updates selectors with new objects
     update_obj_selectas(existing_objs)
+    pn.state.notifications.success('Created ' + new_obj.obj_name +
+                                   ' object!', duration = 4000)
     return
     
 # # Deletes selected object 
@@ -377,7 +389,7 @@ def run_plot_traces(event):
             plot_pane.object = temp.plot_traces() 
             plot_raw_card.append(plot_pane) #Add figure to template
             if save_pdf_rawplot.value:
-                pdf_name = temp.obj_name + "_raw_data.pdf"
+                pdf_name = temp.obj_name + "_raw_data"
                 save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
@@ -414,7 +426,7 @@ def run_normalize_a_signal(event):
                                           biexp_thres.value, linfit_type.value)
             norm_sig_card.append(plot_pane) #Add figure to template
             if save_pdf_norm.value:
-                pdf_name = objs + '_' + pick_signal.value + "_normalized.pdf"
+                pdf_name = objs + '_' + pick_signal.value + "_normalized"
                 save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
@@ -486,16 +498,18 @@ def run_plot_behavior(event):
     for objs in selected_objs:
         temp = fiber_objs[objs]
         # if temp.beh_file is None: # Bug: Plot behavior still runs even without behavior file
-        #Creates pane for plotting
-        plot_pane = pn.pane.Plotly(height = 500) 
         #Sets figure to plot variable
         try:
-            plot_pane.object = temp.plot_behavior(behavior_selecta.value,
-                                              channel_selecta.value) 
-            plot_beh_card.append(plot_pane) #Add figure to template
-            if save_pdf_beh.value:
-                pdf_name = objs + "_behavior_plot.pdf"
-                save_plot(pdf_name, plot_pane.object)
+            plots = temp.plot_behavior(behavior_selecta.value,
+                       channel_selecta.value)
+            for i, plot in enumerate(plots):
+                        #Creates pane for plotting
+                plot_pane = pn.pane.Plotly(height = 500) 
+                plot_pane.object =  plot
+                plot_beh_card.append(plot_pane) #Add figure to template
+                if save_pdf_beh.value:
+                    pdf_name = objs + '_' + channel_selecta.value[i] + "_behavior_plot"
+                    save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
@@ -543,7 +557,7 @@ def run_plot_PETS(event):
                                                         percent_bool.value) 
                     PETS_card.append(plot_pane) #Add figure to template
                     if save_pdf_PETS.value:
-                        pdf_name = objs + "_" + beh + "_" + channel + "_PSTH.pdf"
+                        pdf_name = objs + "_" + beh + "_" + channel + "_PSTH"
                         save_plot(pdf_name, plot_pane.object)
                 except Exception as e:
                     logger.error(traceback.format_exc())
@@ -552,7 +566,49 @@ def run_plot_PETS(event):
                     continue
 
     return
-                
+
+def run_peak_finding(event): 
+    """
+    Displays time series plots with identified peaks
+    for each selected object, and channel combination. 
+    
+    Parameters
+    ----------
+    event : int
+        NOT USED. Number of times button has been clicked. 
+    
+    Returns
+    ----------
+    None
+    """
+    selected_objs = peak_selecta.value
+    start_time = peak_start_time.value
+    end_time = peak_end_time.value
+    width_range = peak_width_slider.value
+    for objs in selected_objs:
+        temp = fiber_objs[objs]
+        for channel in peak_channel_selecta.value:
+            #Creates pane for plotting
+            plot_pane = pn.pane.Plotly(height = 500,
+                                       sizing_mode = "stretch_width") 
+            #Sets figure to plot variable
+            try:
+                plot_pane.object = temp.peak_finding(channel,
+                                                    start_time, end_time, 
+                                                    width_range,
+                                                    save_peak_data.value) 
+                peak_card.append(plot_pane) #Add figure to template
+                if save_peak_pdf.value:
+                    pdf_name = objs + "_" + channel + "peaks"
+                    save_plot(pdf_name, plot_pane.object)
+            except Exception as e:
+                logger.error(traceback.format_exc())
+                pn.state.notifications.error(
+                    'Error: Please check logger for more info', duration = 4000)
+                continue
+
+    return
+
 # Runs the pearsons correlation coefficient
 def run_pearsons_correlation(event):
     """
@@ -585,7 +641,7 @@ def run_pearsons_correlation(event):
         pearsons_card.append(plot_pane) #Add figure to template
         if save_pdf_time_corr.value:
             pdf_name = (name1 + '_' + channel1 + '_and_' + 
-                        name2 + '_' + channel2 + "_correlation.pdf")
+                        name2 + '_' + channel2 + "_correlation")
             save_plot(pdf_name, plot_pane.object)
     except ValueError:
         return
@@ -628,7 +684,7 @@ def run_beh_specific_pearsons(event):
             if save_pdf_beh_corr.value:
                 pdf_name = (name1 + '_' + channel1 + '_and_' + 
                             name2 + '_' + channel2 + '_' + 
-                            behavior + "_correlation.pdf")
+                            behavior + "_correlation")
                 save_plot(pdf_name, plot_pane.object)
         except Exception as e:
             logger.error(traceback.format_exc())
@@ -666,6 +722,14 @@ def run_download_results(event):
                 pn.state.notifications.success(
                     'PETS Results Saved', duration = 4000)
                 print("PETS results saved at: " + os.path.abspath(""))
+            if types == 'Peak Finding Results':
+                results = pd.concat([fiber_objs[name].peak_results
+                                    for name in results_selecta.value],
+                                    ignore_index=True)
+                results.to_csv(filename + '_peak_results.csv', mode = 'x')
+                pn.state.notifications.success(
+                    'Peak Finding Results Saved', duration = 4000)
+                print("Peak Finding results saved at: " + os.path.abspath(""))
             if types == 'Correlation Results':
                 results = pd.concat([fiber_objs[name].correlation_results
                                     for name in results_selecta.value],
@@ -684,12 +748,14 @@ def run_download_results(event):
                 print("Behavior correlation results saved at: " + os.path.abspath(""))
         except FileExistsError:
             pn.state.notifications.error(
-                'Error: Please check logger for more info', duration = 4000)
+                'Error: ' + types + ' could not be saved. Check logger for more info',
+                duration = 4000)
             print('A file with this name already exists. Please change the output filename')
         except Exception as e:
             logger.error(traceback.format_exc())
             pn.state.notifications.error(
-                'Error: Please check logger for more info', duration = 4000)
+                'Error: ' + types + ' could not be saved. Check logger for more info',
+                duration = 4000)
             continue
     return
             
@@ -726,7 +792,6 @@ def run_convert_alt_beh(event):
         try:
             beh_data = fc.alt_to_boris(alt_beh_file, time_unit.value, beh_false.value,
                                        time_between_bouts.value)
-            # print(beh_data)
             obj.import_behavior_data(beh_data, name)
             fiber_data.loc[obj.obj_name, 'Behavior File'] = obj.beh_filename
             info_table.value = fiber_data
@@ -745,8 +810,8 @@ def run_convert_alt_beh(event):
 #Saves plot as pdf.
 def save_plot(graph_name, fig):
     """
-    Takes in a filename and a fig and saves that fig if a file
-    with the same name does not already exist
+    Takes in a filename and a fig and saves that fig
+    with the filename and a suffix if necessary to avoid overwriting.
     
     Parameters
     ----------
@@ -759,15 +824,20 @@ def save_plot(graph_name, fig):
     ----------
     None
     """
-    if os.path.exists(os.path.abspath(graph_name)):
-        pn.state.notifications.error(
-        'Error: Please check logger for more info', duration = 4000)
-        print('Your file was not saved because a file named ' + 
-              graph_name + " already exists in this directory. " + 
-              "Please rename or relocate the file and try again")
+    file_exists = True
+    if os.path.exists(os.path.abspath(graph_name + '.pdf')):
+        copy = 1
+        while file_exists:
+            if os.path.exists(os.path.abspath(graph_name + '(' +
+                                              str(copy) + ').pdf')):
+                copy = copy + 1
+            else:
+                file_exists = False
+                fig.write_image(graph_name + '(' + str(copy) + ').pdf')
+                print(graph_name + '(' + str(copy) + ').pdf saved at: ' + os.path.abspath(""))
     else:
-        fig.write_image(graph_name)
-        print(graph_name + "saved at: " + os.path.abspath(""))
+        fig.write_image(graph_name + '.pdf')
+        print(graph_name + ".pdf saved at: " + os.path.abspath(""))
     return
 
 #Updates available signal options based on selected object
@@ -793,9 +863,7 @@ def update_selecta_options(event):
             temp = fiber_objs[objs]
             available_channels = temp.channels & available_channels
         pick_signal.options = list(available_channels)
-        pick_signal.value = list(available_channels)[0]
         pick_reference.options = list(available_channels)+[None]
-        pick_reference.value = list(available_channels)[0]
 
     
     # Plot Behav card
@@ -821,32 +889,46 @@ def update_selecta_options(event):
             available_channels = temp.channels & available_channels
         PETS_beh_selecta.options = list(available_behaviors)
         zchannel_selecta.options = list(available_channels)
-        
+
+    #peaks card
+    selected_peaks = peak_selecta.value
+    if selected_peaks:
+        available_channels = fiber_objs[selected_peaks[0]].channels
+        for objs in selected_norm:
+            temp = fiber_objs[objs]
+            available_channels = temp.channels & available_channels
+        peak_channel_selecta.options = list(available_channels)
+
     #Pearsons card
-    name1 = pearsons_selecta1.value
-    name2 = pearsons_selecta2.value
-    obj1 = fiber_objs[name1]
-    obj2 = fiber_objs[name2]
-    available_channels1 = obj1.channels
-    available_channels2 = obj2.channels
-    channel1_selecta.options = list(available_channels1)
-    channel2_selecta.options = list(available_channels2)
-    channel1_selecta.value = list(available_channels1)[0]
-    channel2_selecta.value = list(available_channels2)[0]
+    try:
+        name1 = pearsons_selecta1.value
+        name2 = pearsons_selecta2.value
+        obj1 = fiber_objs[name1]
+        obj2 = fiber_objs[name2]
+        available_channels1 = obj1.channels
+        available_channels2 = obj2.channels
+        channel1_selecta.options = list(available_channels1)
+        channel2_selecta.options = list(available_channels2)
+    except:
+        channel1_selecta.options = []
+        channel2_selecta.options = []
     
     #Correlation for a behavior
-    name1 = beh_corr_selecta1.value
-    name2 = beh_corr_selecta2.value
-    obj1 = fiber_objs[name1]
-    obj2 = fiber_objs[name2]
-    available_channels1 = obj1.channels
-    available_channels2 = obj2.channels
-    available_behaviors = obj1.behaviors & obj2.behaviors
-    beh_corr_channel_selecta1.options = list(available_channels1)
-    beh_corr_channel_selecta2.options = list(available_channels2)
-    beh_corr_behavior_selecta.options = list(available_behaviors)
-    beh_corr_channel_selecta1.value = list(available_channels1)[0]
-    beh_corr_channel_selecta2.value = list(available_channels2)[0]
+    try:
+        name1 = beh_corr_selecta1.value
+        name2 = beh_corr_selecta2.value
+        obj1 = fiber_objs[name1]
+        obj2 = fiber_objs[name2]
+        available_channels1 = obj1.channels
+        available_channels2 = obj2.channels
+        available_behaviors = obj1.behaviors & obj2.behaviors
+        beh_corr_channel_selecta1.options = list(available_channels1)
+        beh_corr_channel_selecta2.options = list(available_channels2)
+        beh_corr_behavior_selecta.options = list(available_behaviors)
+    except:
+        beh_corr_channel_selecta1.options = []
+        beh_corr_channel_selecta2.options = []
+        beh_corr_behavior_selecta.options = []
     return
 
 # Clear plots by card function
@@ -898,6 +980,11 @@ def clear_plots(event):
             if isinstance(beh_corr_card.objects[i], pn.pane.plotly.Plotly):
                 beh_corr_card.remove(beh_corr_card.objects[i])
                 return
+    if clear_peaks.clicks:
+        for i in range(len(peak.objects)):
+            if isinstance(peak_card.objects[i], pn.pane.plotly.Plotly):
+                peak_card.remove(peak_card.objects[i])
+                return
     return
          
 def update_obj_selectas(existing_objs):
@@ -919,6 +1006,7 @@ def update_obj_selectas(existing_objs):
     behav_selecta.options = [*existing_objs]
     plot_beh_selecta.options = [*existing_objs]
     PETS_selecta.options = [*existing_objs]
+    peak_selecta.options = [*existing_objs]
     pearsons_selecta1.options = [*existing_objs]
     pearsons_selecta2.options = [*existing_objs]
     beh_corr_selecta1.options = [*existing_objs]
@@ -1014,7 +1102,6 @@ upload_pkl_selecta = pn.widgets.FileInput(name = 'Upload Saved Fiber Objects',
 #Buttons
 upload_pkl_btn = pn.widgets.Button(name = 'Upload Object(s)',
                                    button_type = 'primary',
-                                    
                                    align = 'end')
 upload_pkl_btn.on_click(run_upload_fiberobj) #Button action
 
@@ -1030,9 +1117,9 @@ load_obj_box = pn.WidgetBox('# Reload saved Fiber Objects',
 #File input parameter
 combine_obj_name = pn.widgets.TextInput(name = 'New Object Name', value = '',
                                        width = 80)
-combine_obj_selecta1 = pn.widgets.Select(name = 'First Object', value = [],
+combine_obj_selecta1 = pn.widgets.Select(name = 'First Object', value = '',
                                          options = [])
-combine_obj_selecta2 = pn.widgets.Select(name = 'Second Object', value = [],
+combine_obj_selecta2 = pn.widgets.Select(name = 'Second Object', value = '',
                                          options = [])
 combine_type_selecta = pn.widgets.Select(name = 'Stitch type',
                                          value = 'Obj2 starts immediately after Obj1',
@@ -1135,8 +1222,8 @@ plot_raw_card = pn.Card(plot_raw_widget, plot_ops, title = 'Plot Raw Signal',
 
 norm_selecta = pn.widgets.MultiSelect(name = 'Fiber Objects', value = [],
                                       options = [])
-pick_signal = pn.widgets.Select(name = 'Signal', value = [], options = [])
-pick_reference = pn.widgets.Select(name = 'Reference', value = [], options = [])
+pick_signal = pn.widgets.Select(name = 'Signal', value = '', options = [])
+pick_reference = pn.widgets.Select(name = 'Reference', value = '', options = [])
 biexp_thres = pn.widgets.FloatInput(name = 'Biexpoential goodness of fit threshold(R^2)', value = 0.05,
                                        width = 80)
 linfit_type = pn.widgets.Select(name = 'Fit type for motion correction', options = ['Least squares', 'Quartile fit', 'tmac'])
@@ -1180,7 +1267,7 @@ norm_sig_card = pn.Card(norm_sig_widget, plot_ops,
 #Input variables
 behav_input = pn.widgets.FileInput(name = 'Upload Behavior Data',
                                    accept = '.csv') #File input parameter
-behav_selecta = pn.widgets.Select(name = 'Fiber Objects', value = [],
+behav_selecta = pn.widgets.Select(name = 'Fiber Objects', value = '',
                                   options = [])
 alt_beh_input = pn.widgets.FileInput(name = 'Upload Behavior Data',
                                   accept = '.csv')
@@ -1196,8 +1283,8 @@ upload_beh_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and
                                     and status columns to the dataframe.""")
 convert_info = pn.pane.Markdown(""" - Imports user uploaded behavior data and reads 
                                     dataframe to update and include subject, behavior,
-                                    and status columns to the dataframe.""" )
-time_unit = pn.widgets.Select(name = 'Time unit', value = 'milliseconds',
+                                    and status columns to the dataframe.""")
+time_unit = pn.widgets.Select(name = 'Time unit', value = 'seconds',
                               options = ['milliseconds', 'seconds', 'minutes'],
                               width = 100, sizing_mode = 'fixed')
 
@@ -1348,16 +1435,69 @@ PETS_card = pn.Card(PETS_widget, plot_ops,
 
 # ----------------------------------------------------- # 
 # ----------------------------------------------------- # 
+#Peak Finding widget
+
+#Input variables
+peak_selecta = pn.widgets.MultiSelect(name = 'Fiber Objects', value = [],
+                                      options = [])
+peak_channel_selecta = pn.widgets.MultiSelect(name = 'Signal', value = [],
+                                              options = [])
+peak_start_time = pn.widgets.IntInput(name = 'Start Time', width = 50,
+                                       placeholder = 'Seconds', value = 0)
+peak_end_time = pn.widgets.IntInput(name = 'End Time', width = 50,
+                                     placeholder = 'Seconds', value = -1)
+peak_width_slider = pn.widgets.RangeSlider(name = 'Peak Width Range',
+                                           start = 0, end = 5,
+                                           value = (0.1, 0.2), step = 0.01)
+save_peak_data = pn.widgets.Checkbox(name='Save data as a .csv', value = False)
+save_peak_pdf = pn.widgets.Checkbox(name='Save plot as pdf', value = False)
+
+#Buttons
+peak_btn = pn.widgets.Button(name = 'Find Peaks',
+                             button_type = 'primary', width = 200,
+                             sizing_mode = 'stretch_width',
+                             align = 'start')
+peak_btn.on_click(run_peak_finding) #Button action
+peak_options_btn = pn.widgets.Button(name = 'Update Options',
+                                        button_type = 'primary', width = 200,
+                                        sizing_mode = 'stretch_width',
+                                        align = 'start')
+peak_options_btn.on_click(update_selecta_options) #Button action
+clear_peaks = pn.widgets.Button(name = 'Clear Plots \u274c', 
+                                button_type = 'danger', 
+                                width = 30, sizing_mode = 'fixed',
+                                align = 'start')
+clear_peaks.on_click(clear_plots)
+
+peak_info = pn.pane.Markdown(""" - Takes in user chosen objects and 
+                              channels then creates plots with all 
+                              identified peaks.""",
+                              width = 200)
+#Box
+peak_row  = pn.Row(peak_start_time, peak_end_time)
+peak_widget = pn.WidgetBox('# Peak Finding', peak_info, peak_selecta,
+                              peak_options_btn, peak_channel_selecta,
+                              peak_row, peak_width_slider, peak_btn, save_peak_data)
+plot_ops = pn.Row(save_peak_pdf,  clear_peaks,
+                  sizing_mode = 'stretch_width', margin = (0, 100, 0, 0))
+peak_card = pn.Card(peak_widget, plot_ops,
+                        title = 'Peak Finding',
+                        background = 'WhiteSmoke', sizing_mode = 'stretch_width',
+                        collapsed = True)
+
+
+# ----------------------------------------------------- # 
+# ----------------------------------------------------- # 
 #Pearsons Correlation widget
 
 #Input variables
-pearsons_selecta1 = pn.widgets.Select(name = 'Object 1', value = [],
+pearsons_selecta1 = pn.widgets.Select(name = 'Object 1', value = "",
                                       options = [])
-pearsons_selecta2 = pn.widgets.Select(name = 'Object 2', value = [],
+pearsons_selecta2 = pn.widgets.Select(name = 'Object 2', value = "",
                                       options = [])
-channel1_selecta = pn.widgets.Select(name = 'Signal', value = [],
+channel1_selecta = pn.widgets.Select(name = 'Signal', value = "",
                                      options = [])
-channel2_selecta = pn.widgets.Select(name = 'Signal', value = [],
+channel2_selecta = pn.widgets.Select(name = 'Signal', value = "",
                                      options = [])
 pears_start_time = pn.widgets.IntInput(name = 'Start Time', width = 50,
                                        placeholder = 'Seconds', value = 0)
@@ -1403,13 +1543,13 @@ pearsons_card = pn.Card(pearson_widget, plot_ops,
 #Behavior specific pearsons widget
 
 #Input variables
-beh_corr_selecta1 = pn.widgets.Select(name = 'Object 1', value = [],
+beh_corr_selecta1 = pn.widgets.Select(name = 'Object 1', value = '',
                                       options = [])
-beh_corr_selecta2 = pn.widgets.Select(name = 'Object 2', value = [],
+beh_corr_selecta2 = pn.widgets.Select(name = 'Object 2', value = '',
                                       options = [])
-beh_corr_channel_selecta1 = pn.widgets.Select(name = 'Signal', value = [],
+beh_corr_channel_selecta1 = pn.widgets.Select(name = 'Signal', value = '',
                                                   options = [])
-beh_corr_channel_selecta2 = pn.widgets.Select(name = 'Signal', value = [],
+beh_corr_channel_selecta2 = pn.widgets.Select(name = 'Signal', value = '',
                                                   options = [])
 beh_corr_behavior_selecta = pn.widgets.MultiSelect(name = 'Behavior',
                                                    value = [], options = [])
@@ -1458,6 +1598,7 @@ results_selecta = pn.widgets.MultiSelect(name = 'Fiber Objects', value = [],
                                          options = [])
 result_type_selecta= pn.widgets.MultiSelect(name = 'Result Types', value = [],
                                             options = ['PETS Results',
+                                                       'Peak Finding Results',
                                                        'Correlation Results',
                                                        'Behavior Specific Correlation Reuslts'])
 
@@ -1516,6 +1657,7 @@ material.main.append(plot_raw_card)
 material.main.append(norm_sig_card)
 material.main.append(plot_beh_card)
 material.main.append(PETS_card)
+material.main.append(peak_card)
 material.main.append(pearsons_card)
 material.main.append(beh_corr_card)
 material.main.append(download_results_card)
