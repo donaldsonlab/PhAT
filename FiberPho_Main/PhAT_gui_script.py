@@ -201,47 +201,62 @@ def run_upload_fiberobj(event):
     ----------
     None
     """
-    filenames = upload_pkl_selecta.filename
-    for filename in filenames:
+    filenames = upload_pkl_selecta.value
+    # list of pickle objects to create
+    pkl_objs = []
+    # Read files and prepare for upload
+    for file in filenames:
         try:
-            temp_obj = pd.read_pickle(filename)
-        except FileNotFoundError:                    
+            temp_obj = pd.read_pickle(file)
+            if temp_obj.obj_name in fiber_objs.keys():
+                continue
+            else:
+                fiber_objs[temp_obj.obj_name] = temp_obj # Add obj to info table
+                pkl_objs.append(temp_obj)
+        except FileNotFoundError:             
             pn.state.notifications.error(
                 'Error: Please check logger for more info',
                 duration = 4000)
-            print(filename + ' could not be uploaded.' + 
+            print(file + ' could not be uploaded.' + 
                   ' You can only upload pickles located in the FiberPho_Main folder.')
             continue
         except EOFError:                    
             pn.state.notifications.error(
                 'Error: Please check logger for more info', duration = 4000)
-            print("Error uploading " + filename + ". Ensure this is a valid .pkl file")
+            print("Error uploading " + file + ". Ensure this is a valid .pkl file")
             continue
-        fiber_objs[temp_obj.obj_name] = temp_obj
         if not hasattr(temp_obj, 'version') or temp_obj.version != current_version:
             pn.state.notifications.error(
             'Warning: Please check logger for more info', duration = 4000)
             print(temp_obj.obj_name + " is out of date. " + 
                   "It may cause problems in certain functions")
+
+    # Read pickles into objects
+    for obj in pkl_objs:
         try:
-            fiber_data.loc[temp_obj.obj_name] = ([temp_obj.fiber_num,
-                                          temp_obj.animal_num,
-                                          temp_obj.exp_date,
-                                          temp_obj.exp_time,
-                                          temp_obj.filename,
-                                          temp_obj.beh_filename])
-            info_table.value = fiber_data
+            fiber_data.loc[obj.obj_name] = ([obj.fiber_num,
+                                          obj.animal_num,
+                                          obj.exp_date,
+                                          obj.exp_time,
+                                          obj.filename,
+                                          obj.beh_filename])
+            info_table.value = fiber_data # Update info table with new obj data
+            pn.state.notifications.success('Uploaded ' + obj.obj_name
+                                   + ' object!', duration = 4000)
         except Exception as e:
             pn.state.notifications.error(
                 'Error: Please check logger for more info', duration = 4000)
             logger.error(traceback.format_exc())
-            print("There was an issue adding " + temp_obj.obj_name +
+            print("There was an issue adding " + obj.obj_name +
                   "'s information to the table.")
-        pn.state.notifications.success('Uploaded ' + temp_obj.obj_name
-                                   + ' object!', duration = 4000)
-    existing_objs = fiber_objs
+
     # Updates all cards with new objects
+    existing_objs = fiber_objs
     update_obj_selectas(existing_objs)
+    # Clear selecta values
+    upload_pkl_selecta.value.clear()
+    # Clear pkls from list
+    pkl_objs.clear()
     return
 
 # Combine two objects into one
