@@ -1111,8 +1111,8 @@ init_obj_box = pn.WidgetBox('# Create new fiber object', fpho_input,
 
 #Input variables
 #File input parameter
-upload_pkl_selecta = pn.widgets.FileInput(name = 'Upload Saved Fiber Objects',
-                                          accept = '.pickle', multiple=True)
+upload_pkl_selecta = pn.widgets.FileSelector('.', default = '.pickle', only_files = True, height = 300,
+                                            refresh_period = 10000)
 
 #Buttons
 upload_pkl_btn = pn.widgets.Button(name = 'Upload Object(s)',
@@ -1123,6 +1123,8 @@ upload_pkl_btn.on_click(run_upload_fiberobj) #Button action
 #Box
 load_obj_box = pn.WidgetBox('# Reload saved Fiber Objects',
                             upload_pkl_selecta, upload_pkl_btn)
+
+load_obj_card = pn.Card(load_obj_box, title = 'Pickle Loader', background = 'WhiteSmoke', collapsed = True)
 
 # ----------------------------------------------------- #
 # ----------------------------------------------------- # 
@@ -1662,12 +1664,12 @@ material = pn.template.MaterialTemplate(
 material.sidebar.append(pn.pane.Markdown(
     "** Upload your photometry data *(.csv)* ** and set your fiber object's **attributes** here"))
 material.sidebar.append(init_obj_box)
-material.sidebar.append(load_obj_box)
 material.sidebar.append(combine_obj_box)
 material.sidebar.append(save_obj_box)
 material.sidebar.append(delete_obj_box)
 
 material.main.append(pn.Row(upload_beh_card, obj_info_card))
+material.main.append(load_obj_card)
 material.main.append(plot_raw_card)
 material.main.append(norm_sig_card)
 material.main.append(plot_beh_card)
