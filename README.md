@@ -1,6 +1,6 @@
 # Fiber Photometry GUI by CU Boulder's Donaldson Lab
 
-**A detailed protocol for the installation, use and modifcation of this software can be found on bioRxiv at: https://www.biorxiv.org/content/10.1101/2023.03.14.532489v1.full**
+**A detailed protocol for the installation, use and modifcation of this software can be found in Current Protocols in Neuroscience at: https://doi.org/10.1002/cpz1.763**
 
 
 ## Installation Instructions
