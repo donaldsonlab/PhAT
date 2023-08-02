@@ -65,7 +65,9 @@ Using Anaconda (Option 1: Recommended)
 &ensp;    ii. Windows: “.\[your_env_name]\Scripts\activate” 
 5. Execute the following commands to install dependencies. \
 &ensp;     “pip install -r requirements.txt”
-6. Optional* Add the tmac package (https://github.com/Nondairy-Creamer/tmac) for motion correction with the following commands: \
+6. Launch the GUI by executing the following bash script in your terminal: \
+&ensp;     "bash gui_script.sh"
+8. Optional* Add the tmac package (https://github.com/Nondairy-Creamer/tmac) for motion correction with the following commands: \
 &ensp; "cd Fiberpho_main" \
 &ensp; "git clone https://github.com/Nondairy-Creamer/tmac" \
 &ensp; "cd tmac" \
