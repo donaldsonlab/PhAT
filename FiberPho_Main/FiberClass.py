@@ -195,10 +195,15 @@ class FiberObj:
         """
 
         data_dict = {}
+        
+        my_list = [False, True, False, True, False]
+        contains_true = any(my_list)
         #Check for green ROI
         try:
             test_green = time_slice.columns.str.endswith('G')
-        except:
+            if not any(test_green): # If there is no green fluoresence, raise exception
+                raise LookupError
+        except LookupError:
             green_roi = False
             print('no green ROI found')
         else:
@@ -207,7 +212,9 @@ class FiberObj:
         #Check for red ROI
         try:
             test_red = time_slice.columns.str.endswith('R')
-        except:
+            if not any(test_red): # If there is no red fluoresence, raise exception
+                raise LookupError
+        except LookupError:
             red_roi = False
             print('no red ROI found')
         else:
