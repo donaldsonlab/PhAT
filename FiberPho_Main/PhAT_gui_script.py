@@ -201,47 +201,62 @@ def run_upload_fiberobj(event):
     ----------
     None
     """
-    filenames = upload_pkl_selecta.filename
-    for filename in filenames:
+    filenames = upload_pkl_selecta.value
+    # list of pickle objects to create
+    pkl_objs = []
+    # Read files and prepare for upload
+    for file in filenames:
         try:
-            temp_obj = pd.read_pickle(filename)
-        except FileNotFoundError:                    
+            temp_obj = pd.read_pickle(file)
+            if temp_obj.obj_name in fiber_objs.keys():
+                continue
+            else:
+                fiber_objs[temp_obj.obj_name] = temp_obj # Add obj to info table
+                pkl_objs.append(temp_obj)
+        except FileNotFoundError:             
             pn.state.notifications.error(
                 'Error: Please check logger for more info',
                 duration = 4000)
-            print(filename + ' could not be uploaded.' + 
+            print(file + ' could not be uploaded.' + 
                   ' You can only upload pickles located in the FiberPho_Main folder.')
             continue
         except EOFError:                    
             pn.state.notifications.error(
                 'Error: Please check logger for more info', duration = 4000)
-            print("Error uploading " + filename + ". Ensure this is a valid .pkl file")
+            print("Error uploading " + file + ". Ensure this is a valid .pkl file")
             continue
-        fiber_objs[temp_obj.obj_name] = temp_obj
         if not hasattr(temp_obj, 'version') or temp_obj.version != current_version:
             pn.state.notifications.error(
             'Warning: Please check logger for more info', duration = 4000)
             print(temp_obj.obj_name + " is out of date. " + 
                   "It may cause problems in certain functions")
+
+    # Read pickles into objects
+    for obj in pkl_objs:
         try:
-            fiber_data.loc[temp_obj.obj_name] = ([temp_obj.fiber_num,
-                                          temp_obj.animal_num,
-                                          temp_obj.exp_date,
-                                          temp_obj.exp_time,
-                                          temp_obj.filename,
-                                          temp_obj.beh_filename])
-            info_table.value = fiber_data
+            fiber_data.loc[obj.obj_name] = ([obj.fiber_num,
+                                          obj.animal_num,
+                                          obj.exp_date,
+                                          obj.exp_time,
+                                          obj.filename,
+                                          obj.beh_filename])
+            info_table.value = fiber_data # Update info table with new obj data
+            pn.state.notifications.success('Uploaded ' + obj.obj_name
+                                   + ' object!', duration = 4000)
         except Exception as e:
             pn.state.notifications.error(
                 'Error: Please check logger for more info', duration = 4000)
             logger.error(traceback.format_exc())
-            print("There was an issue adding " + temp_obj.obj_name +
+            print("There was an issue adding " + obj.obj_name +
                   "'s information to the table.")
-        pn.state.notifications.success('Uploaded ' + temp_obj.obj_name
-                                   + ' object!', duration = 4000)
-    existing_objs = fiber_objs
+
     # Updates all cards with new objects
+    existing_objs = fiber_objs
     update_obj_selectas(existing_objs)
+    # Clear selecta values
+    upload_pkl_selecta.value.clear()
+    # Clear pkls from list
+    pkl_objs.clear()
     return
 
 # Combine two objects into one
@@ -1096,8 +1111,10 @@ init_obj_box = pn.WidgetBox('# Create new fiber object', fpho_input,
 
 #Input variables
 #File input parameter
-upload_pkl_selecta = pn.widgets.FileInput(name = 'Upload Saved Fiber Objects',
-                                          accept = '.pickle', multiple=True)
+# upload_pkl_selecta = pn.widgets.FileInput(name = 'Upload Saved Fiber Objects',
+#                                           accept = '.pickle', multiple = True)
+upload_pkl_selecta = pn.widgets.FileSelector('.', default = '.pickle', only_files = True, height = 300,
+                                            refresh_period = 10000, align = 'start')
 
 #Buttons
 upload_pkl_btn = pn.widgets.Button(name = 'Upload Object(s)',
@@ -1108,6 +1125,9 @@ upload_pkl_btn.on_click(run_upload_fiberobj) #Button action
 #Box
 load_obj_box = pn.WidgetBox('# Reload saved Fiber Objects',
                             upload_pkl_selecta, upload_pkl_btn)
+
+load_obj_card = pn.Card(load_obj_box, title = 'Pickle Loader', background = 'WhiteSmoke', collapsed = True)
+
 
 # ----------------------------------------------------- #
 # ----------------------------------------------------- # 
@@ -1135,7 +1155,6 @@ combine_time = pn.widgets.FloatInput(name = 'x seconds', value = 0,
 #Buttons
 combine_obj_btn = pn.widgets.Button(name = 'Combine Objects',
                                    button_type = 'primary',
-                                    
                                    align = 'end')
 combine_obj_btn.on_click(run_combine_objs) #Button action
 
@@ -1647,12 +1666,12 @@ material = pn.template.MaterialTemplate(
 material.sidebar.append(pn.pane.Markdown(
     "** Upload your photometry data *(.csv)* ** and set your fiber object's **attributes** here"))
 material.sidebar.append(init_obj_box)
-material.sidebar.append(load_obj_box)
 material.sidebar.append(combine_obj_box)
 material.sidebar.append(save_obj_box)
 material.sidebar.append(delete_obj_box)
 
 material.main.append(pn.Row(upload_beh_card, obj_info_card))
+material.main.append(load_obj_card)
 material.main.append(plot_raw_card)
 material.main.append(norm_sig_card)
 material.main.append(plot_beh_card)
