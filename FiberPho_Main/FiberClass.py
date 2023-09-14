@@ -644,9 +644,12 @@ class FiberObj:
         e_sig = popt[4]  # E value
 
         # Generate fit line using calculated coefficients
-        fit_sig = 1.5*(max(sig))*self.fit_exp(sig_time, a_sig, b_sig, c_sig, d_sig, e_sig)
-        sig_r_square = np.corrcoef(sig, fit_sig)[0,1] ** 2
-
+        if biexp_thres < 1:
+            fit_sig = 1.5*(max(sig))*self.fit_exp(sig_time, a_sig, b_sig, c_sig, d_sig, e_sig)
+            sig_r_square = np.corrcoef(sig, fit_sig)[0,1] ** 2
+        else:
+            sig_r_square == 0
+            
         if sig_r_square < biexp_thres:
             a_sig= 0
             b_sig= 0
@@ -677,9 +680,11 @@ class FiberObj:
             e_ref = popt[4]  # E value
 
             # Generate fit line using calculated coefficients
-
-            fit_ref = 1.5*(max(ref))*self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
-            ref_r_square = np.corrcoef(ref, fit_ref)[0,1] ** 2
+            if biexp_thres < 1:
+                fit_ref = 1.5*(max(ref))*self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
+                ref_r_square = np.corrcoef(ref, fit_ref)[0,1] ** 2
+            else:
+                ref_r_square == 0
 
             if ref_r_square < biexp_thres:
                 a_ref = 0
