@@ -632,23 +632,24 @@ class FiberObj:
             sig_time = self.fpho_data_df['time_' + signal.split('_')[1]]
         except KeyError:
             sig_time = self.fpho_data_df['time']
-
         sig = self.fpho_data_df[signal]
-        popt, pcov = curve_fit(self.fit_exp, sig_time, sig/(1.5*(max(sig))),
-                               p0 = (1.0, 0, 1.0, 0, 0),
-                               bounds =  ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
-        a_sig= popt[0]  # A value
-        b_sig= popt[1]  # B value
-        c_sig = popt[2]  # C value
-        d_sig = popt[3]  # D value
-        e_sig = popt[4]  # E value
+        
+        if biexp_thres < 1:
+            popt, pcov = curve_fit(self.fit_exp, sig_time, sig/(1.5*(max(sig))),
+                                   p0 = (1.0, 0, 1.0, 0, 0),
+                                   bounds =  ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
+            a_sig= popt[0]  # A value
+            b_sig= popt[1]  # B value
+            c_sig = popt[2]  # C value
+            d_sig = popt[3]  # D value
+            e_sig = popt[4]  # E value
 
         # Generate fit line using calculated coefficients
-        if biexp_thres < 1:
+        
             fit_sig = 1.5*(max(sig))*self.fit_exp(sig_time, a_sig, b_sig, c_sig, d_sig, e_sig)
             sig_r_square = np.corrcoef(sig, fit_sig)[0,1] ** 2
         else:
-            sig_r_square == 0
+            sig_r_square = 0
             
         if sig_r_square < biexp_thres:
             a_sig= 0
@@ -670,21 +671,21 @@ class FiberObj:
             except KeyError:
                 ref_time = self.fpho_data_df['time']
             ref = self.fpho_data_df[reference]
-            popt, pcov = curve_fit(self.fit_exp, ref_time, ref/(1.5*(max(ref))),
-                                   p0=(1.0, 0, 1.0, 0, 0),
-                                   bounds = ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
-            a_ref = popt[0]  # A value
-            b_ref = popt[1]  # B value
-            c_ref = popt[2]  # C value
-            d_ref = popt[3]  # D value
-            e_ref = popt[4]  # E value
+            if biexp_thres < 1:
+                popt, pcov = curve_fit(self.fit_exp, ref_time, ref/(1.5*(max(ref))),
+                                       p0=(1.0, 0, 1.0, 0, 0),
+                                       bounds = ([0, 0, 0, 0, 0], [np.inf,10,np.inf,100,1]))
+                a_ref = popt[0]  # A value
+                b_ref = popt[1]  # B value
+                c_ref = popt[2]  # C value
+                d_ref = popt[3]  # D value
+                e_ref = popt[4]  # E value
 
             # Generate fit line using calculated coefficients
-            if biexp_thres < 1:
                 fit_ref = 1.5*(max(ref))*self.fit_exp(ref_time, a_ref, b_ref, c_ref, d_ref, e_ref)
                 ref_r_square = np.corrcoef(ref, fit_ref)[0,1] ** 2
             else:
-                ref_r_square == 0
+                ref_r_square = 0
 
             if ref_r_square < biexp_thres:
                 a_ref = 0
