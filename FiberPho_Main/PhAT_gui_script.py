@@ -364,6 +364,7 @@ def run_save_fiberobj(event):
                 print("Error: This filename already exists, please try again.")
                 return
             else:
+                temp.version = current_version
                 with open(obj + '.pickle', 'wb') as handle:
                     pickle.dump(temp, handle)
                 pn.state.notifications.success('# ' + temp.obj_name
@@ -1121,9 +1122,14 @@ upload_pkl_btn = pn.widgets.Button(name = 'Upload Object(s)',
                                    button_type = 'primary',
                                    align = 'end')
 upload_pkl_btn.on_click(run_upload_fiberobj) #Button action
-
+# Instructions how to navigate directories
+nav_info = pn.pane.Markdown(""" * In order to change directories, click on a folder, then press the down arrow to go into the folder <br>
+                                * The up arrow will navigate out of the folder (the back/forward arrows will navigate as is) <br>
+                                * The refresh button will update the available directories <br>
+                                * Highlight whatever pickles you would like to upload on the left-hand side <br>
+                                * Then click the >> arrows in the middle to select them for uploading """)
 #Box
-load_obj_box = pn.WidgetBox('# Reload saved Fiber Objects',
+load_obj_box = pn.WidgetBox('# Reload saved Fiber Objects', nav_info,
                             upload_pkl_selecta, upload_pkl_btn)
 
 load_obj_card = pn.Card(load_obj_box, title = 'Pickle Loader', background = 'WhiteSmoke', collapsed = True)
