@@ -1346,6 +1346,16 @@ class FiberObj:
             csv_name = self.obj_name + '_' + channel + '_' + beh + '_Baseline_' + PETS_baseline
             self.save_data_to_csv(PETS_data, csv_name)
         return fig
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
     # Zscore calc helper
     def zscore(self, data, mean = None, std = None):
