@@ -430,7 +430,6 @@ class FiberObj:
     def combine_objs(self, obj2, new_obj_name, combine_type, time_adj):
         """
         Combines attributes from two different objects to create a new object.
-
         Parameters
         ----------
         self : FiberObj
@@ -444,7 +443,6 @@ class FiberObj:
         time_adj : float
             time adjustment a value used in different ways
             depending on the combine_type selected
-
         Returns
         ----------
         class object : fiberObj
@@ -467,28 +465,19 @@ class FiberObj:
             print("""These files cannot be combined because
             they do not have the same raw data channels""")
             return
-
         if abs(self.frame_rate - obj2.frame_rate) > 1:
             print('error')
             return
-
         if self.behaviors != obj2.behaviors:
             print('Warning: the behaviors in obj1 and different than the behaviors in obj2')
-
-        self.obj_name = new_obj_name
-
         if self.fiber_num != obj2.fiber_num:
             self.fiber_num = [self.fiber_num, obj2.fiber_num]
-
         if self.animal_num != obj2.animal_num:
             self.animal_num = [self.animal_num, obj2.animal_num]
-
         if self.exp_date != obj2.exp_date:
             self.exp_date = self.exp_date + ', ' + obj2.exp_date
-
         if self.filename != obj2.filename:
             self.filename = self.filename + ', ' + obj2.filename
-
         if self.beh_filename != obj2.beh_filename:
             self.beh_filename = self.beh_filename + ', ' + obj2.beh_filename
         #self.start_time and start_idx will be the start time and idx from the first obj
@@ -515,45 +504,42 @@ class FiberObj:
                                                         'Behavior',
                                                         'Number of Events',
                                                         'R Score', 'p score'])
-
         ## Do a bunch of shit to combine the frames
         time_cols = [col for col in self.fpho_data_df.columns if 'time' in col]
+        new_obj2_df = obj2.fpho_data_df.copy(deep=True)
         if combine_type == 'Obj2 starts immediately after Obj1':
-            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
-                                            obj2.fpho_data_df[time_cols[0]][0])
-            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] +
+            new_obj2_df[time_cols] = (new_obj2_df[time_cols] -
+                                            new_obj2_df[time_cols[0]][0])
+            new_obj2_df[time_cols] = (new_obj2_df[time_cols] +
                                             self.fpho_data_df[time_cols[0]].iloc[-1] +
                                             self.frame_rate)
         elif combine_type == 'Use Obj2 current start time':
             if obj2.fpho_data_df[time_cols[0]][0] < self.fpho_data_df[time_cols[0]].iloc[-1]:
-                print(obj2.obj_name + ' starts before ' + self.obj_name +
+                raise Exception(obj2.obj_name + ' starts before ' + self.obj_name +
                       ' ends. Choose a different stitching method' )
                 return
-
-        elif combine_type == 'Use x secs for Obj2s start time':
-            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
-                                                obj2.fpho_data_df[time_cols[0]][0])
-            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] + time_adj)
-
-        elif combine_type == 'Obj2 starts x secs after Obj1 ends':
-            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] -
-                                                obj2.fpho_data_df[time_cols[0]][0])
-            obj2.fpho_data_df[time_cols] = (obj2.fpho_data_df[time_cols] +
+        elif combine_type == 'Use x seconds for Obj2s start time':
+            new_obj2_df[time_cols] = (new_obj2_df[time_cols] -
+                                                new_obj2_df[time_cols[0]][0])
+            new_obj2_df[time_cols] = (new_obj2_df[time_cols] + time_adj)
+        elif combine_type == 'Obj2 starts x seconds after Obj1 ends':
+            new_obj2_df[time_cols] = (new_obj2_df[time_cols] -
+                                                 new_obj2_df[time_cols[0]][0])
+            new_obj2_df[time_cols] = (new_obj2_df[time_cols] +
                                             self.fpho_data_df[time_cols[0]].iloc[-1] +
                                             time_adj)
-
         #self.fpho_data_df = pd.DataFrame.from_dict(data_dict)
-
+        print('obj2 starting at ',  new_obj2_df[time_cols[0]][0])
         self_beh_cols = self.fpho_data_df.select_dtypes('object').columns
-        obj2_beh_cols = obj2.fpho_data_df.select_dtypes('object').columns
-        obj2_temp_df = obj2.fpho_data_df
+        obj2_beh_cols =  new_obj2_df.select_dtypes('object').columns
         for col in self_beh_cols:
             if col not in obj2_beh_cols:
-                obj2_temp_df[col] = ""
+                new_obj2_df[col] = ""
         for col in obj2_beh_cols:
             if col not in self_beh_cols:
                 self.fpho_data_df[col] = ""
-        self.fpho_data_df = pd.concat([self.fpho_data_df, obj2_temp_df], join = 'inner')
+        self.fpho_data_df = pd.concat([self.fpho_data_df, new_obj2_df], join = 'inner', ignore_index = True)
+        self.obj_name = new_obj_name
         return
 
     #Signal Trace function
