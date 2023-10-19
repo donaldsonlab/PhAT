@@ -715,7 +715,7 @@ class FiberObj:
                     return
             else:
                 if linfit_type == 'Least squares':
-                    popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
+                    popt, pcov = curve_fit(self.fit_lin, normed_ref, normed_sig,
                                            bounds = ([0, -1], [100, 1]))
                     a_lin = popt[0]
                     b_lin = popt[1]
