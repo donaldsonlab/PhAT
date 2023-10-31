@@ -114,6 +114,7 @@ class FiberObj:
         self.sig_fit_coefficients = ''
         self.ref_fit_coefficients = ''
         self.sig_to_ref_coefficients = ''
+        self.PETS_data = []
         self.version = 4 #variable names have changed since version 1 and 2
         #out of date objs can be updated by updating attribute variable names
         #file_name -> filename, startIdx -> start_idx, endIdx -> end_idx
@@ -701,7 +702,7 @@ class FiberObj:
                     return
             else:
                 if linfit_type == 'Least squares':
-                    popt, pcov = curve_fit(self.fit_lin, normed_sig, normed_ref,
+                    popt, pcov = curve_fit(self.fit_lin, normed_ref, normed_sig,
                                            bounds = ([0, -1], [100, 1]))
                     a_lin = popt[0]
                     b_lin = popt[1]
@@ -1342,20 +1343,11 @@ class FiberObj:
                                'Number of events' : [n_events], 'Baseline' : [PETS_baseline],
                                'Normalization type' : [norm_type]})
         self.PETS_results = pd.concat([self.PETS_results, results])
+        self.PETS_data.append(PETS_data)
         if save_csv:
             csv_name = self.obj_name + '_' + channel + '_' + beh + '_Baseline_' + PETS_baseline
             self.save_data_to_csv(PETS_data, csv_name)
         return fig
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 
     # Zscore calc helper
     def zscore(self, data, mean = None, std = None):
