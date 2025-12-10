@@ -1237,7 +1237,7 @@ class FiberObj:
                     norm_type = 'Z-score'
 
                 # Aligns time series and adds each trace to a dict
-                if n_events > 1:
+                if n_events >= 1:
                     PETS_dict['event' + str(n_events)] = this_time_series
                     PETS_time_dict['event' + str(n_events)] = time_trace
                 #plot requested traces
